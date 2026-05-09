@@ -18,7 +18,10 @@ void main() {
     );
 
     expect(find.text('PizzaTracker setup'), findsOneWidget);
-    expect(find.text('flutter run'), findsOneWidget);
+    expect(
+      find.text('./scripts/sync_client_env.sh && flutter run'),
+      findsOneWidget,
+    );
   });
 
   testWidgets('renders dashboard with budget card', (tester) async {

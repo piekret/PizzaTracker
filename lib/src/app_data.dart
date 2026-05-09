@@ -39,24 +39,20 @@ class AppRepository {
 
   Future<void> ensureProfile() async {
     final user = _requireUser();
-    final rows = await _client
+    await _client
         .from('users_profiles')
-        .select('id')
-        .eq('id', user.id)
-        .limit(1);
-
-    if (rows.isNotEmpty) {
-      return;
-    }
-
-    await _client.from('users_profiles').insert({
-      'id': user.id,
-      'display_name': user.email?.split('@').first,
-      'monthly_budget': 0,
-      'budget_reset_day': 1,
-      'currency': 'USD',
-      'timezone': 'Europe/Warsaw',
-    });
+        .upsert(
+          {
+            'id': user.id,
+            'display_name': user.email?.split('@').first,
+            'monthly_budget': 0,
+            'budget_reset_day': 1,
+            'currency': 'USD',
+            'timezone': 'Europe/Warsaw',
+          },
+          onConflict: 'id',
+          ignoreDuplicates: true,
+        );
   }
 
   Future<UserProfile> getProfile() async {

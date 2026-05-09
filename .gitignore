@@ -8,6 +8,7 @@
 .env.*
 !.env.example
 !.env.client.example
+/assets/env/client.env
 .atom/
 .build/
 .buildlog/

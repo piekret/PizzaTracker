@@ -228,18 +228,33 @@ class AppSheetFrame extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: EdgeInsets.only(
-        left: 14,
-        right: 14,
-        top: 14,
-        bottom: MediaQuery.viewInsetsOf(context).bottom + 14,
-      ),
-      child: FrostPanel(
-        radius: 24,
-        padding: const EdgeInsets.all(20),
-        child: child,
-      ),
+    final padding = EdgeInsets.only(
+      left: 14,
+      right: 14,
+      top: 14,
+      bottom: MediaQuery.viewInsetsOf(context).bottom + 14,
+    );
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final maxHeight = (constraints.maxHeight - padding.vertical)
+            .clamp(0.0, double.infinity)
+            .toDouble();
+
+        return Padding(
+          padding: padding,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxHeight: maxHeight),
+            child: SingleChildScrollView(
+              child: FrostPanel(
+                radius: 24,
+                padding: const EdgeInsets.all(20),
+                child: child,
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }

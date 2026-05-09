@@ -66,17 +66,19 @@ class SetupScreen extends StatelessWidget {
                       ),
                       const SizedBox(height: 12),
                       Text(
-                        'Flutter reads only the client-safe Supabase values from .env.client. Keep OpenAI, service-role, Firebase admin, and database secrets in .env only.',
+                        'Flutter reads client-safe Supabase values from dart-defines first, then the generated assets/env/client.env asset. Keep OpenAI, service-role, Firebase admin, and database secrets in .env only.',
                         style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                           color: Theme.of(context).colorScheme.onSurfaceVariant,
                           height: 1.45,
                         ),
                       ),
                       const SizedBox(height: 22),
-                      const _CommandBox(command: 'flutter run'),
+                      const _CommandBox(
+                        command: './scripts/sync_client_env.sh && flutter run',
+                      ),
                       const SizedBox(height: 16),
                       Text(
-                        'If this screen stays visible, copy .env.client.example to .env.client and fill SUPABASE_URL plus SUPABASE_ANON_KEY.',
+                        'If this screen stays visible, fill .env with SUPABASE_URL plus SUPABASE_ANON_KEY, run the sync script, then start Flutter again.',
                         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                           color: Theme.of(context).colorScheme.onSurfaceVariant,
                         ),

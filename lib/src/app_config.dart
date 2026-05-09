@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 final appConfigProvider = Provider<AppConfig?>((ref) => null);
 
+const _clientEnvAsset = 'assets/env/client.env';
+
 class AppConfig {
   const AppConfig({required this.supabaseUrl, required this.supabaseAnonKey});
 
@@ -16,7 +18,7 @@ class AppConfig {
     }
 
     try {
-      await dotenv.load(fileName: '.env.client');
+      await dotenv.load(fileName: _clientEnvAsset);
     } catch (_) {
       return null;
     }

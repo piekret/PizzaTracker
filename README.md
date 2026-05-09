@@ -1,17 +1,38 @@
-# pizza_tracker
+# PizzaTracker
 
-A new Flutter project.
+Flutter student budget tracker with Supabase auth/database integration.
 
-## Getting Started
+## Local Setup
 
-This project is a starting point for a Flutter application.
+Fill `.env` in the project root. For plain Flutter runs, the app reads client-safe Supabase values from `.env.client`.
 
-A few resources to get you started if this is your first Flutter project:
+If you changed Supabase values in `.env`, sync the client file once:
 
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
+```bash
+./scripts/sync_client_env.sh
+```
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+Then run:
+
+```bash
+flutter run
+```
+
+Keep `OPENAI_API_KEY`, service-role keys, Firebase admin credentials, and database passwords in `.env` only. Do not put them in `.env.client`; that file is bundled into the Flutter app.
+
+You can still run with explicit dart defines if needed:
+
+```bash
+./scripts/flutter_run_from_env.sh
+```
+
+## Checks
+
+```bash
+flutter analyze
+flutter test
+```
+
+## Database
+
+The current MVP expects the Supabase schema from `docs/supabase-ai-prompt.md`, including `users_profiles`, `expense_items`, and the `get_budget_snapshot` RPC.

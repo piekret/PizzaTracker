@@ -1,30 +1,74 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
-
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-
-import 'package:pizza_tracker/main.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:pizza_tracker/src/app_config.dart';
+import 'package:pizza_tracker/src/app_data.dart';
+import 'package:pizza_tracker/src/app_theme.dart';
+import 'package:pizza_tracker/src/pizza_tracker_app.dart';
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const MyApp());
+  testWidgets('shows setup screen when Supabase config is missing', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [appConfigProvider.overrideWithValue(null)],
+        child: const PizzaTrackerApp(),
+      ),
+    );
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
+    expect(find.text('PizzaTracker setup'), findsOneWidget);
+    expect(find.text('flutter run'), findsOneWidget);
+  });
 
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
+  testWidgets('renders dashboard with budget card', (tester) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          userProfileProvider.overrideWith((ref) async {
+            return const UserProfile(
+              id: 'user-id',
+              displayName: 'Tester',
+              monthlyBudget: 1200,
+              budgetResetDay: 1,
+              currency: 'USD',
+              timezone: 'Europe/Warsaw',
+            );
+          }),
+          budgetSnapshotProvider.overrideWith((ref) async {
+            return const BudgetSnapshot(
+              monthlyBudget: 1200,
+              fixedMonthlyExpenses: 300,
+              disposableBudget: 900,
+              spentThisPeriod: 180,
+              remainingBudget: 720,
+              daysLeft: 18,
+              dailyLimit: 40,
+              desperationIndex: 24,
+            );
+          }),
+          recentExpensesProvider.overrideWith((ref) async {
+            return [
+              ExpenseItem(
+                id: 'expense-id',
+                name: 'Test pizza',
+                amount: 19.99,
+                category: 'food',
+                expenseDate: DateTime(2026, 5, 9),
+              ),
+            ];
+          }),
+        ],
+        child: MaterialApp(
+          theme: buildAppTheme(AppThemePreset.pizza),
+          home: const DashboardScreen(),
+        ),
+      ),
+    );
 
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Monthly budget locked in'), findsOneWidget);
+    expect(find.text('DESPERATION INDEX'), findsOneWidget);
   });
 }

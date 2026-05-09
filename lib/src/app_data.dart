@@ -22,6 +22,14 @@ final recentExpensesProvider = FutureProvider<List<ExpenseItem>>((ref) async {
   return ref.watch(appRepositoryProvider).getRecentExpenses();
 });
 
+final fixedExpensesProvider = FutureProvider<List<FixedExpense>>((ref) async {
+  return ref.watch(appRepositoryProvider).getFixedExpenses();
+});
+
+final incomeEventsProvider = FutureProvider<List<IncomeEvent>>((ref) async {
+  return ref.watch(appRepositoryProvider).getIncomeEvents();
+});
+
 const expenseCategories = ['food', 'alcohol', 'hygiene', 'fun', 'other'];
 
 class AppRepository {
@@ -121,6 +129,34 @@ class AppRepository {
         .toList();
   }
 
+  Future<List<FixedExpense>> getFixedExpenses() async {
+    _requireUser();
+
+    final rows = await _client
+        .from('fixed_expenses')
+        .select('id, name, amount, billing_day, is_active')
+        .order('billing_day')
+        .order('name');
+
+    return rows
+        .map((row) => FixedExpense.fromMap(Map<String, dynamic>.from(row)))
+        .toList();
+  }
+
+  Future<List<IncomeEvent>> getIncomeEvents() async {
+    _requireUser();
+
+    final rows = await _client
+        .from('income_events')
+        .select('id, name, amount, expected_day, is_recurring')
+        .order('expected_day')
+        .order('name');
+
+    return rows
+        .map((row) => IncomeEvent.fromMap(Map<String, dynamic>.from(row)))
+        .toList();
+  }
+
   Future<void> addManualExpense({
     required String name,
     required double amount,
@@ -137,6 +173,51 @@ class AppRepository {
       'ai_categorized': false,
       'expense_date': DateFormat('yyyy-MM-dd').format(expenseDate),
     });
+  }
+
+  Future<void> addFixedExpense({
+    required String name,
+    required double amount,
+    required int billingDay,
+  }) async {
+    final user = _requireUser();
+
+    await _client.from('fixed_expenses').insert({
+      'user_id': user.id,
+      'name': name.trim(),
+      'amount': amount,
+      'billing_day': billingDay,
+      'is_active': true,
+    });
+  }
+
+  Future<void> deleteFixedExpense(String id) async {
+    _requireUser();
+
+    await _client.from('fixed_expenses').delete().eq('id', id);
+  }
+
+  Future<void> addIncomeEvent({
+    required String name,
+    required double amount,
+    required int expectedDay,
+    required bool isRecurring,
+  }) async {
+    final user = _requireUser();
+
+    await _client.from('income_events').insert({
+      'user_id': user.id,
+      'name': name.trim(),
+      'amount': amount,
+      'expected_day': expectedDay,
+      'is_recurring': isRecurring,
+    });
+  }
+
+  Future<void> deleteIncomeEvent(String id) async {
+    _requireUser();
+
+    await _client.from('income_events').delete().eq('id', id);
   }
 
   User _requireUser() {
@@ -238,6 +319,58 @@ class ExpenseItem {
   }
 }
 
+class FixedExpense {
+  const FixedExpense({
+    required this.id,
+    required this.name,
+    required this.amount,
+    required this.billingDay,
+    required this.isActive,
+  });
+
+  final String id;
+  final String name;
+  final double amount;
+  final int billingDay;
+  final bool isActive;
+
+  factory FixedExpense.fromMap(Map<String, dynamic> map) {
+    return FixedExpense(
+      id: map['id'] as String,
+      name: map['name'] as String,
+      amount: _toDouble(map['amount']),
+      billingDay: _toInt(map['billing_day']),
+      isActive: _toBool(map['is_active']),
+    );
+  }
+}
+
+class IncomeEvent {
+  const IncomeEvent({
+    required this.id,
+    required this.name,
+    required this.amount,
+    required this.expectedDay,
+    required this.isRecurring,
+  });
+
+  final String id;
+  final String name;
+  final double amount;
+  final int expectedDay;
+  final bool isRecurring;
+
+  factory IncomeEvent.fromMap(Map<String, dynamic> map) {
+    return IncomeEvent(
+      id: map['id'] as String,
+      name: map['name'] as String,
+      amount: _toDouble(map['amount']),
+      expectedDay: _toInt(map['expected_day']),
+      isRecurring: _toBool(map['is_recurring']),
+    );
+  }
+}
+
 double _toDouble(Object? value) {
   if (value == null) {
     return 0;
@@ -256,4 +389,14 @@ int _toInt(Object? value) {
     return value.toInt();
   }
   return int.tryParse(value.toString()) ?? 0;
+}
+
+bool _toBool(Object? value) {
+  if (value is bool) {
+    return value;
+  }
+  if (value is num) {
+    return value != 0;
+  }
+  return value?.toString().toLowerCase() == 'true';
 }

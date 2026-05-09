@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 import 'app_theme.dart';
 
@@ -54,22 +53,12 @@ class FrostPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
-    final shadowColor = Theme.of(context).brightness == Brightness.dark
-        ? Colors.black.withValues(alpha: 0.28)
-        : const Color(0xff321806).withValues(alpha: 0.08);
 
     final content = DecoratedBox(
       decoration: BoxDecoration(
         gradient: palette.panelGradient,
         borderRadius: BorderRadius.circular(radius),
         border: Border.all(color: palette.border),
-        boxShadow: [
-          BoxShadow(
-            color: shadowColor,
-            blurRadius: 18,
-            offset: const Offset(0, 10),
-          ),
-        ],
       ),
       child: Padding(padding: padding, child: child),
     );
@@ -113,18 +102,11 @@ class BrandMark extends StatelessWidget {
           color: palette.secondaryGlow.withValues(alpha: 0.32),
           width: 1.4,
         ),
-        boxShadow: [
-          BoxShadow(
-            color: palette.primaryGlow.withValues(alpha: 0.18),
-            blurRadius: 14,
-            offset: const Offset(0, 8),
-          ),
-        ],
       ),
       child: Center(
         child: Text(
           'P',
-          style: GoogleFonts.lora(
+          style: TextStyle(
             color: foreground,
             fontSize: size * 0.46,
             fontWeight: FontWeight.w800,

@@ -582,6 +582,8 @@ class DashboardScreen extends ConsumerWidget {
     final profile = ref.watch(userProfileProvider);
     final budget = ref.watch(budgetSnapshotProvider);
     final expenses = ref.watch(recentExpensesProvider);
+    final fixedExpenses = ref.watch(fixedExpensesProvider);
+    final incomeEvents = ref.watch(incomeEventsProvider);
     final currency = profile.asData?.value.currency ?? 'USD';
 
     return Scaffold(
@@ -607,6 +609,22 @@ class DashboardScreen extends ConsumerWidget {
                   data: (value) => _BudgetSetupCard(profile: value),
                   loading: () =>
                       const _LoadingCard(label: 'Loading profile...'),
+                  error: (error, stackTrace) => _ErrorCard(error: error),
+                ),
+                const SizedBox(height: 14),
+                fixedExpenses.when(
+                  data: (value) =>
+                      _FixedExpensesCard(expenses: value, currency: currency),
+                  loading: () =>
+                      const _LoadingCard(label: 'Loading fixed costs...'),
+                  error: (error, stackTrace) => _ErrorCard(error: error),
+                ),
+                const SizedBox(height: 14),
+                incomeEvents.when(
+                  data: (value) =>
+                      _IncomeEventsCard(events: value, currency: currency),
+                  loading: () =>
+                      const _LoadingCard(label: 'Loading income schedule...'),
                   error: (error, stackTrace) => _ErrorCard(error: error),
                 ),
                 const SizedBox(height: 14),
@@ -641,11 +659,15 @@ class DashboardScreen extends ConsumerWidget {
     ref.invalidate(userProfileProvider);
     ref.invalidate(budgetSnapshotProvider);
     ref.invalidate(recentExpensesProvider);
+    ref.invalidate(fixedExpensesProvider);
+    ref.invalidate(incomeEventsProvider);
 
     await Future.wait([
       ref.read(userProfileProvider.future),
       ref.read(budgetSnapshotProvider.future),
       ref.read(recentExpensesProvider.future),
+      ref.read(fixedExpensesProvider.future),
+      ref.read(incomeEventsProvider.future),
     ]);
   }
 
@@ -883,6 +905,335 @@ class _BudgetSetupCard extends ConsumerWidget {
             child: Text(needsSetup ? 'Set' : 'Edit'),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _FixedExpensesCard extends ConsumerWidget {
+  const _FixedExpensesCard({required this.expenses, required this.currency});
+
+  final List<FixedExpense> expenses;
+  final String currency;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final formatter = NumberFormat.simpleCurrency(name: currency);
+    final activeTotal = expenses
+        .where((expense) => expense.isActive)
+        .fold<double>(0, (sum, expense) => sum + expense.amount);
+
+    return FrostPanel(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Kicker('Budget planning'),
+                    const SizedBox(height: 6),
+                    Text(
+                      'Fixed monthly costs',
+                      style: Theme.of(context).textTheme.titleLarge,
+                    ),
+                  ],
+                ),
+              ),
+              SoftPill(label: formatter.format(activeTotal)),
+            ],
+          ),
+          const SizedBox(height: 14),
+          if (expenses.isEmpty)
+            _PlanningEmptyState(
+              icon: Icons.home_work_outlined,
+              title: 'No fixed costs yet',
+              text:
+                  'Add rent, internet, subscriptions, or anything that hits every month.',
+              actionLabel: 'Add fixed cost',
+              onPressed: () => _showAddFixedExpense(context, ref),
+            )
+          else ...[
+            for (final expense in expenses) ...[
+              _PlanningRow(
+                icon: Icons.receipt_outlined,
+                title: expense.name,
+                subtitle: 'Billed on day ${expense.billingDay}',
+                amount: formatter.format(expense.amount),
+                isMuted: !expense.isActive,
+                onDelete: () => _deleteFixedExpense(context, ref, expense),
+              ),
+              if (expense != expenses.last) const SizedBox(height: 10),
+            ],
+            const SizedBox(height: 14),
+            OutlinedButton.icon(
+              onPressed: () => _showAddFixedExpense(context, ref),
+              icon: const Icon(Icons.add_rounded),
+              label: const Text('Add fixed cost'),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Future<void> _showAddFixedExpense(BuildContext context, WidgetRef ref) async {
+    final saved = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => const AddFixedExpenseSheet(),
+    );
+
+    if (saved == true) {
+      ref.invalidate(fixedExpensesProvider);
+      ref.invalidate(budgetSnapshotProvider);
+    }
+  }
+
+  Future<void> _deleteFixedExpense(
+    BuildContext context,
+    WidgetRef ref,
+    FixedExpense expense,
+  ) async {
+    final messenger = ScaffoldMessenger.of(context);
+
+    try {
+      await ref.read(appRepositoryProvider).deleteFixedExpense(expense.id);
+      ref.invalidate(fixedExpensesProvider);
+      ref.invalidate(budgetSnapshotProvider);
+    } catch (error) {
+      messenger.showSnackBar(SnackBar(content: Text(error.toString())));
+    }
+  }
+}
+
+class _IncomeEventsCard extends ConsumerWidget {
+  const _IncomeEventsCard({required this.events, required this.currency});
+
+  final List<IncomeEvent> events;
+  final String currency;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final formatter = NumberFormat.simpleCurrency(name: currency);
+    final recurringTotal = events
+        .where((event) => event.isRecurring)
+        .fold<double>(0, (sum, event) => sum + event.amount);
+
+    return FrostPanel(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Kicker('Income calendar'),
+                    const SizedBox(height: 6),
+                    Text(
+                      'Expected income',
+                      style: Theme.of(context).textTheme.titleLarge,
+                    ),
+                  ],
+                ),
+              ),
+              SoftPill(label: '${formatter.format(recurringTotal)} recurring'),
+            ],
+          ),
+          const SizedBox(height: 14),
+          if (events.isEmpty)
+            _PlanningEmptyState(
+              icon: Icons.event_available_outlined,
+              title: 'No income dates yet',
+              text:
+                  'Add scholarship, paycheck, or parent transfer days so the calendar makes sense.',
+              actionLabel: 'Add income',
+              onPressed: () => _showAddIncomeEvent(context, ref),
+            )
+          else ...[
+            for (final event in events) ...[
+              _PlanningRow(
+                icon: Icons.payments_outlined,
+                title: event.name,
+                subtitle:
+                    '${event.isRecurring ? 'Recurring' : 'One-time'} on day ${event.expectedDay}',
+                amount: formatter.format(event.amount),
+                onDelete: () => _deleteIncomeEvent(context, ref, event),
+              ),
+              if (event != events.last) const SizedBox(height: 10),
+            ],
+            const SizedBox(height: 14),
+            OutlinedButton.icon(
+              onPressed: () => _showAddIncomeEvent(context, ref),
+              icon: const Icon(Icons.add_rounded),
+              label: const Text('Add income'),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Future<void> _showAddIncomeEvent(BuildContext context, WidgetRef ref) async {
+    final saved = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => const AddIncomeEventSheet(),
+    );
+
+    if (saved == true) {
+      ref.invalidate(incomeEventsProvider);
+    }
+  }
+
+  Future<void> _deleteIncomeEvent(
+    BuildContext context,
+    WidgetRef ref,
+    IncomeEvent event,
+  ) async {
+    final messenger = ScaffoldMessenger.of(context);
+
+    try {
+      await ref.read(appRepositoryProvider).deleteIncomeEvent(event.id);
+      ref.invalidate(incomeEventsProvider);
+    } catch (error) {
+      messenger.showSnackBar(SnackBar(content: Text(error.toString())));
+    }
+  }
+}
+
+class _PlanningEmptyState extends StatelessWidget {
+  const _PlanningEmptyState({
+    required this.icon,
+    required this.title,
+    required this.text,
+    required this.actionLabel,
+    required this.onPressed,
+  });
+
+  final IconData icon;
+  final String title;
+  final String text;
+  final String actionLabel;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: context.palette.surfaceStrong,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: context.palette.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 30, color: context.palette.primaryGlow),
+          const SizedBox(height: 10),
+          Text(title, style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: 4),
+          Text(
+            text,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: 14),
+          OutlinedButton.icon(
+            onPressed: onPressed,
+            icon: const Icon(Icons.add_rounded),
+            label: Text(actionLabel),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PlanningRow extends StatelessWidget {
+  const _PlanningRow({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.amount,
+    required this.onDelete,
+    this.isMuted = false,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final String amount;
+  final VoidCallback onDelete;
+  final bool isMuted;
+
+  @override
+  Widget build(BuildContext context) {
+    final opacity = isMuted ? 0.55 : 1.0;
+
+    return Opacity(
+      opacity: opacity,
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: context.palette.surfaceStrong,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: context.palette.border),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 42,
+              height: 42,
+              decoration: BoxDecoration(
+                color: context.palette.primaryGlow.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Icon(icon, color: context.palette.primaryGlow, size: 21),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title, style: Theme.of(context).textTheme.titleSmall),
+                  const SizedBox(height: 3),
+                  Text(
+                    subtitle,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 10),
+            Text(
+              amount,
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                fontFeatures: const [FontFeature.tabularFigures()],
+              ),
+            ),
+            const SizedBox(width: 2),
+            IconButton(
+              tooltip: 'Delete',
+              onPressed: onDelete,
+              icon: const Icon(Icons.close_rounded),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1193,6 +1544,272 @@ class _ExpenseRow extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class AddFixedExpenseSheet extends ConsumerStatefulWidget {
+  const AddFixedExpenseSheet({super.key});
+
+  @override
+  ConsumerState<AddFixedExpenseSheet> createState() =>
+      _AddFixedExpenseSheetState();
+}
+
+class _AddFixedExpenseSheetState extends ConsumerState<AddFixedExpenseSheet> {
+  final _formKey = GlobalKey<FormState>();
+  final _nameController = TextEditingController();
+  final _amountController = TextEditingController();
+  final _billingDayController = TextEditingController(text: '1');
+
+  bool _isSaving = false;
+  String? _error;
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _amountController.dispose();
+    _billingDayController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
+
+    setState(() {
+      _isSaving = true;
+      _error = null;
+    });
+
+    try {
+      await ref
+          .read(appRepositoryProvider)
+          .addFixedExpense(
+            name: _nameController.text,
+            amount: double.parse(_amountController.text.replaceAll(',', '.')),
+            billingDay: int.parse(_billingDayController.text),
+          );
+      if (mounted) {
+        Navigator.of(context).pop(true);
+      }
+    } catch (error) {
+      setState(() => _error = error.toString());
+    } finally {
+      if (mounted) {
+        setState(() => _isSaving = false);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AppSheetFrame(
+      child: Form(
+        key: _formKey,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Kicker('Monthly fixed cost'),
+            const SizedBox(height: 8),
+            Text(
+              'Add fixed cost',
+              style: Theme.of(context).textTheme.headlineMedium,
+            ),
+            const SizedBox(height: 16),
+            TextFormField(
+              controller: _nameController,
+              decoration: const InputDecoration(
+                labelText: 'Name',
+                prefixIcon: Icon(Icons.home_work_outlined),
+              ),
+              textInputAction: TextInputAction.next,
+              validator: (value) {
+                if (value == null || value.trim().isEmpty) {
+                  return 'Name is required.';
+                }
+                return null;
+              },
+            ),
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: _amountController,
+              decoration: const InputDecoration(
+                labelText: 'Monthly amount',
+                prefixIcon: Icon(Icons.payments_outlined),
+              ),
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
+              validator: _validatePositiveAmount,
+            ),
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: _billingDayController,
+              decoration: const InputDecoration(
+                labelText: 'Billing day',
+                prefixIcon: Icon(Icons.event_repeat_outlined),
+              ),
+              keyboardType: TextInputType.number,
+              validator: _validateMonthDay,
+            ),
+            if (_error != null) ...[
+              const SizedBox(height: 12),
+              _InlineError(message: _error!),
+            ],
+            const SizedBox(height: 16),
+            FilledButton(
+              onPressed: _isSaving ? null : _save,
+              child: _isSaving
+                  ? const SizedBox.square(
+                      dimension: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Text('Save fixed cost'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class AddIncomeEventSheet extends ConsumerStatefulWidget {
+  const AddIncomeEventSheet({super.key});
+
+  @override
+  ConsumerState<AddIncomeEventSheet> createState() =>
+      _AddIncomeEventSheetState();
+}
+
+class _AddIncomeEventSheetState extends ConsumerState<AddIncomeEventSheet> {
+  final _formKey = GlobalKey<FormState>();
+  final _nameController = TextEditingController();
+  final _amountController = TextEditingController();
+  final _expectedDayController = TextEditingController(text: '1');
+
+  bool _isRecurring = true;
+  bool _isSaving = false;
+  String? _error;
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _amountController.dispose();
+    _expectedDayController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
+
+    setState(() {
+      _isSaving = true;
+      _error = null;
+    });
+
+    try {
+      await ref
+          .read(appRepositoryProvider)
+          .addIncomeEvent(
+            name: _nameController.text,
+            amount: double.parse(_amountController.text.replaceAll(',', '.')),
+            expectedDay: int.parse(_expectedDayController.text),
+            isRecurring: _isRecurring,
+          );
+      if (mounted) {
+        Navigator.of(context).pop(true);
+      }
+    } catch (error) {
+      setState(() => _error = error.toString());
+    } finally {
+      if (mounted) {
+        setState(() => _isSaving = false);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AppSheetFrame(
+      child: Form(
+        key: _formKey,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Kicker('Incoming money'),
+            const SizedBox(height: 8),
+            Text(
+              'Add income',
+              style: Theme.of(context).textTheme.headlineMedium,
+            ),
+            const SizedBox(height: 16),
+            TextFormField(
+              controller: _nameController,
+              decoration: const InputDecoration(
+                labelText: 'Name',
+                prefixIcon: Icon(Icons.work_outline),
+              ),
+              textInputAction: TextInputAction.next,
+              validator: (value) {
+                if (value == null || value.trim().isEmpty) {
+                  return 'Name is required.';
+                }
+                return null;
+              },
+            ),
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: _amountController,
+              decoration: const InputDecoration(
+                labelText: 'Amount',
+                prefixIcon: Icon(Icons.payments_outlined),
+              ),
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
+              validator: _validatePositiveAmount,
+            ),
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: _expectedDayController,
+              decoration: const InputDecoration(
+                labelText: 'Expected day',
+                prefixIcon: Icon(Icons.event_available_outlined),
+              ),
+              keyboardType: TextInputType.number,
+              validator: _validateMonthDay,
+            ),
+            const SizedBox(height: 8),
+            SwitchListTile.adaptive(
+              contentPadding: EdgeInsets.zero,
+              value: _isRecurring,
+              onChanged: (value) => setState(() => _isRecurring = value),
+              title: const Text('Repeats every month'),
+              subtitle: const Text('Turn off for one-time transfers.'),
+            ),
+            if (_error != null) ...[
+              const SizedBox(height: 12),
+              _InlineError(message: _error!),
+            ],
+            const SizedBox(height: 16),
+            FilledButton(
+              onPressed: _isSaving ? null : _save,
+              child: _isSaving
+                  ? const SizedBox.square(
+                      dimension: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Text('Save income'),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1603,6 +2220,22 @@ class _InlineError extends StatelessWidget {
       ),
     );
   }
+}
+
+String? _validatePositiveAmount(String? value) {
+  final amount = double.tryParse((value ?? '').replaceAll(',', '.'));
+  if (amount == null || amount <= 0) {
+    return 'Enter an amount above 0.';
+  }
+  return null;
+}
+
+String? _validateMonthDay(String? value) {
+  final day = int.tryParse(value ?? '');
+  if (day == null || day < 1 || day > 28) {
+    return 'Use a day from 1 to 28.';
+  }
+  return null;
 }
 
 ({Color color, String label, String shortLabel, IconData icon}) _levelForIndex(

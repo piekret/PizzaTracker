@@ -58,6 +58,28 @@ void main() {
               ),
             ];
           }),
+          fixedExpensesProvider.overrideWith((ref) async {
+            return const [
+              FixedExpense(
+                id: 'fixed-id',
+                name: 'Rent',
+                amount: 500,
+                billingDay: 1,
+                isActive: true,
+              ),
+            ];
+          }),
+          incomeEventsProvider.overrideWith((ref) async {
+            return const [
+              IncomeEvent(
+                id: 'income-id',
+                name: 'Scholarship',
+                amount: 900,
+                expectedDay: 5,
+                isRecurring: true,
+              ),
+            ];
+          }),
         ],
         child: MaterialApp(
           theme: buildAppTheme(AppThemePreset.pizza),
@@ -69,6 +91,15 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Monthly budget locked in'), findsOneWidget);
+    expect(find.text('Fixed monthly costs'), findsOneWidget);
+    expect(find.text('Expected income'), findsOneWidget);
+
+    await tester.scrollUntilVisible(
+      find.text('DESPERATION INDEX'),
+      500,
+      scrollable: find.byType(Scrollable),
+    );
+
     expect(find.text('DESPERATION INDEX'), findsOneWidget);
   });
 }

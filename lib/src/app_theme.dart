@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 final appThemePresetProvider =
     NotifierProvider<AppThemePresetController, AppThemePreset>(
@@ -218,56 +217,60 @@ ThemeData buildAppTheme(AppThemePreset preset) {
     brightness: preset.brightness,
     colorScheme: colorScheme,
   );
-  final baseText = GoogleFonts.interTextTheme(baseTheme.textTheme);
+  final baseText = baseTheme.textTheme;
   final textTheme = baseText
       .copyWith(
-        displayLarge: GoogleFonts.lora(
+        displayLarge: TextStyle(
+          fontFamily: 'serif',
           fontSize: 58,
           height: 0.95,
           letterSpacing: -2.8,
           fontWeight: FontWeight.w700,
           color: colorScheme.onSurface,
         ),
-        displayMedium: GoogleFonts.lora(
+        displayMedium: TextStyle(
+          fontFamily: 'serif',
           fontSize: 42,
           height: 1.02,
           letterSpacing: -1.8,
           fontWeight: FontWeight.w700,
           color: colorScheme.onSurface,
         ),
-        headlineLarge: GoogleFonts.lora(
+        headlineLarge: TextStyle(
+          fontFamily: 'serif',
           fontSize: 32,
           height: 1.05,
           letterSpacing: -1.2,
           fontWeight: FontWeight.w700,
           color: colorScheme.onSurface,
         ),
-        headlineMedium: GoogleFonts.lora(
+        headlineMedium: TextStyle(
+          fontFamily: 'serif',
           fontSize: 26,
           height: 1.08,
           letterSpacing: -0.9,
           fontWeight: FontWeight.w700,
           color: colorScheme.onSurface,
         ),
-        titleLarge: GoogleFonts.inter(
+        titleLarge: TextStyle(
           fontSize: 21,
           letterSpacing: -0.4,
           fontWeight: FontWeight.w800,
           color: colorScheme.onSurface,
         ),
-        titleMedium: GoogleFonts.inter(
+        titleMedium: TextStyle(
           fontSize: 17,
           letterSpacing: -0.25,
           fontWeight: FontWeight.w800,
           color: colorScheme.onSurface,
         ),
-        labelLarge: GoogleFonts.inter(
+        labelLarge: TextStyle(
           fontSize: 14,
           letterSpacing: 0.1,
           fontWeight: FontWeight.w800,
           color: colorScheme.onSurface,
         ),
-        labelSmall: GoogleFonts.inter(
+        labelSmall: TextStyle(
           fontSize: 11,
           letterSpacing: 1.1,
           fontWeight: FontWeight.w800,
@@ -295,7 +298,8 @@ ThemeData buildAppTheme(AppThemePreset preset) {
       foregroundColor: colorScheme.onSurface,
       elevation: 0,
       centerTitle: false,
-      titleTextStyle: GoogleFonts.lora(
+      titleTextStyle: TextStyle(
+        fontFamily: 'serif',
         fontSize: 22,
         fontWeight: FontWeight.w700,
         color: colorScheme.onSurface,
@@ -328,7 +332,7 @@ ThemeData buildAppTheme(AppThemePreset preset) {
       style: FilledButton.styleFrom(
         minimumSize: const Size(0, 52),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-        textStyle: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w800),
+        textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800),
       ),
     ),
     outlinedButtonTheme: OutlinedButtonThemeData(
@@ -337,12 +341,12 @@ ThemeData buildAppTheme(AppThemePreset preset) {
         side: BorderSide(color: palette.border),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         foregroundColor: colorScheme.onSurface,
-        textStyle: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w800),
+        textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800),
       ),
     ),
     textButtonTheme: TextButtonThemeData(
       style: TextButton.styleFrom(
-        textStyle: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w800),
+        textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800),
       ),
     ),
     floatingActionButtonTheme: FloatingActionButtonThemeData(

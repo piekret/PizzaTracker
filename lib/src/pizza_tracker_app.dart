@@ -682,7 +682,7 @@ class DashboardScreen extends ConsumerWidget {
       builder: (context) => const AddExpenseSheet(),
     );
 
-    if (saved == true) {
+    if (saved == true && context.mounted) {
       ref.invalidate(budgetSnapshotProvider);
       ref.invalidate(recentExpensesProvider);
     }
@@ -1398,14 +1398,14 @@ class _DesperationCard extends StatelessWidget {
   }
 }
 
-class _RecentExpensesCard extends StatelessWidget {
+class _RecentExpensesCard extends ConsumerWidget {
   const _RecentExpensesCard({required this.expenses, required this.currency});
 
   final List<ExpenseItem> expenses;
   final String currency;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return FrostPanel(
       padding: const EdgeInsets.all(20),
       child: Column(
@@ -1439,12 +1439,79 @@ class _RecentExpensesCard extends StatelessWidget {
                 amount: NumberFormat.simpleCurrency(
                   name: currency,
                 ).format(expense.amount),
+                onEdit: () => _showEditExpense(context, ref, expense),
+                onDelete: () => _deleteExpense(context, ref, expense),
               ),
               if (expense != expenses.last) const SizedBox(height: 10),
             ],
         ],
       ),
     );
+  }
+
+  Future<void> _showEditExpense(
+    BuildContext context,
+    WidgetRef ref,
+    ExpenseItem expense,
+  ) async {
+    final saved = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => AddExpenseSheet(expense: expense),
+    );
+
+    if (saved == true && context.mounted) {
+      ref.invalidate(budgetSnapshotProvider);
+      ref.invalidate(recentExpensesProvider);
+    }
+  }
+
+  Future<void> _deleteExpense(
+    BuildContext context,
+    WidgetRef ref,
+    ExpenseItem expense,
+  ) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final repository = ref.read(appRepositoryProvider);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Delete expense?'),
+          content: Text('Remove ${expense.name} from your budget history?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton.tonal(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Delete'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed != true || !context.mounted) {
+      return;
+    }
+
+    try {
+      await repository.deleteExpense(expense.id);
+      if (!context.mounted) {
+        return;
+      }
+      ref.invalidate(budgetSnapshotProvider);
+      ref.invalidate(recentExpensesProvider);
+    } catch (error) {
+      if (!context.mounted) {
+        return;
+      }
+      messenger.showSnackBar(SnackBar(content: Text(error.toString())));
+    }
   }
 }
 
@@ -1488,10 +1555,17 @@ class _EmptyExpenses extends StatelessWidget {
 }
 
 class _ExpenseRow extends StatelessWidget {
-  const _ExpenseRow({required this.expense, required this.amount});
+  const _ExpenseRow({
+    required this.expense,
+    required this.amount,
+    required this.onEdit,
+    required this.onDelete,
+  });
 
   final ExpenseItem expense;
   final String amount;
+  final VoidCallback onEdit;
+  final VoidCallback onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -1544,6 +1618,32 @@ class _ExpenseRow extends StatelessWidget {
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
               fontFeatures: const [FontFeature.tabularFigures()],
             ),
+          ),
+          PopupMenuButton<String>(
+            tooltip: 'Expense actions',
+            onSelected: (value) {
+              if (value == 'edit') {
+                onEdit();
+                return;
+              }
+              onDelete();
+            },
+            itemBuilder: (context) => const [
+              PopupMenuItem(
+                value: 'edit',
+                child: ListTile(
+                  leading: Icon(Icons.edit_outlined),
+                  title: Text('Edit'),
+                ),
+              ),
+              PopupMenuItem(
+                value: 'delete',
+                child: ListTile(
+                  leading: Icon(Icons.delete_outline),
+                  title: Text('Delete'),
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -1818,7 +1918,9 @@ class _AddIncomeEventSheetState extends ConsumerState<AddIncomeEventSheet> {
 }
 
 class AddExpenseSheet extends ConsumerStatefulWidget {
-  const AddExpenseSheet({super.key});
+  const AddExpenseSheet({this.expense, super.key});
+
+  final ExpenseItem? expense;
 
   @override
   ConsumerState<AddExpenseSheet> createState() => _AddExpenseSheetState();
@@ -1826,13 +1928,30 @@ class AddExpenseSheet extends ConsumerStatefulWidget {
 
 class _AddExpenseSheetState extends ConsumerState<AddExpenseSheet> {
   final _formKey = GlobalKey<FormState>();
-  final _nameController = TextEditingController();
-  final _amountController = TextEditingController();
+  late final TextEditingController _nameController;
+  late final TextEditingController _amountController;
 
   String _category = 'food';
   DateTime _expenseDate = DateTime.now();
   bool _isSaving = false;
   String? _error;
+
+  bool get _isEditing => widget.expense != null;
+
+  @override
+  void initState() {
+    super.initState();
+
+    final expense = widget.expense;
+    _nameController = TextEditingController(text: expense?.name ?? '');
+    _amountController = TextEditingController(
+      text: expense == null ? '' : expense.amount.toStringAsFixed(2),
+    );
+    _category = expenseCategories.contains(expense?.category)
+        ? expense!.category
+        : 'other';
+    _expenseDate = expense?.expenseDate ?? DateTime.now();
+  }
 
   @override
   void dispose() {
@@ -1852,14 +1971,26 @@ class _AddExpenseSheetState extends ConsumerState<AddExpenseSheet> {
     });
 
     try {
-      await ref
-          .read(appRepositoryProvider)
-          .addManualExpense(
-            name: _nameController.text,
-            amount: double.parse(_amountController.text.replaceAll(',', '.')),
-            category: _category,
-            expenseDate: _expenseDate,
-          );
+      final amount = double.parse(_amountController.text.replaceAll(',', '.'));
+      final repository = ref.read(appRepositoryProvider);
+      final expense = widget.expense;
+
+      if (expense == null) {
+        await repository.addManualExpense(
+          name: _nameController.text,
+          amount: amount,
+          category: _category,
+          expenseDate: _expenseDate,
+        );
+      } else {
+        await repository.updateExpense(
+          id: expense.id,
+          name: _nameController.text,
+          amount: amount,
+          category: _category,
+          expenseDate: _expenseDate,
+        );
+      }
       if (mounted) {
         Navigator.of(context).pop(true);
       }
@@ -1884,7 +2015,7 @@ class _AddExpenseSheetState extends ConsumerState<AddExpenseSheet> {
             const Kicker('Manual entry'),
             const SizedBox(height: 8),
             Text(
-              'Add expense',
+              _isEditing ? 'Edit expense' : 'Add expense',
               style: Theme.of(context).textTheme.headlineMedium,
             ),
             const SizedBox(height: 16),
@@ -1966,7 +2097,7 @@ class _AddExpenseSheetState extends ConsumerState<AddExpenseSheet> {
                       dimension: 18,
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
-                  : const Text('Save expense'),
+                  : Text(_isEditing ? 'Save changes' : 'Save expense'),
             ),
           ],
         ),

@@ -104,5 +104,13 @@ void main() {
     );
 
     expect(find.text('DESPERATION INDEX'), findsOneWidget);
+
+    await tester.scrollUntilVisible(
+      find.text('Test pizza'),
+      500,
+      scrollable: find.byType(Scrollable),
+    );
+
+    expect(find.byTooltip('Expense actions'), findsOneWidget);
   });
 }

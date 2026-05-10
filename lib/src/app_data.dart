@@ -171,6 +171,37 @@ class AppRepository {
     });
   }
 
+  Future<void> updateExpense({
+    required String id,
+    required String name,
+    required double amount,
+    required String category,
+    required DateTime expenseDate,
+  }) async {
+    final user = _requireUser();
+
+    await _client
+        .from('expense_items')
+        .update({
+          'name': name.trim(),
+          'amount': amount,
+          'category': category,
+          'expense_date': DateFormat('yyyy-MM-dd').format(expenseDate),
+        })
+        .eq('id', id)
+        .eq('user_id', user.id);
+  }
+
+  Future<void> deleteExpense(String id) async {
+    final user = _requireUser();
+
+    await _client
+        .from('expense_items')
+        .delete()
+        .eq('id', id)
+        .eq('user_id', user.id);
+  }
+
   Future<void> addFixedExpense({
     required String name,
     required double amount,

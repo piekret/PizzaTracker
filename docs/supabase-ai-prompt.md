@@ -157,7 +157,7 @@ v_category_monthly_summary:
 - disposable_budget = greatest(monthly_budget - fixed_monthly_expenses, 0).
 - remaining_budget = disposable_budget - spent_this_period.
 - daily_limit = remaining_budget / greatest(days_left, 1), rounded to 2 decimals.
-- desperation_index should be an integer from 0 to 100 based on budget pressure. Use a simple deterministic formula that increases as daily_limit drops below ideal daily budget and as remaining_budget becomes negative.
+- desperation_index should be an integer from 0 to 100 based on budget pressure. Use a deterministic formula with three parts: daily_pressure = clamp((ideal_daily - daily_limit) / ideal_daily, 0, 1), schedule_pressure = clamp((expected_remaining - remaining_budget) / disposable_budget, 0, 1), and over_budget_pressure = greatest(-remaining_budget / disposable_budget, 0). expected_remaining = ideal_daily * greatest(days_left, 1). desperation_index = clamp(round((daily_pressure * 30) + (schedule_pressure * 60) + (over_budget_pressure * 70)), 0, 100). If disposable_budget is 0, return 100 only when remaining_budget is negative, otherwise 0.
 - Mark it stable if possible, otherwise leave default volatility.
 - Do not use service role assumptions; it must rely on auth.uid().
 

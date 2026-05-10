@@ -58,6 +58,7 @@ void main() {
                 amount: 19.99,
                 category: 'food',
                 expenseDate: DateTime(2026, 5, 9),
+                receiptId: 'receipt-id',
               ),
             ];
           }),
@@ -69,6 +70,7 @@ void main() {
                 amount: 19.99,
                 category: 'food',
                 expenseDate: DateTime(2026, 5, 9),
+                receiptId: 'receipt-id',
               ),
               ExpenseItem(
                 id: 'expense-soap',
@@ -117,6 +119,7 @@ void main() {
 
     await tester.pumpAndSettle();
 
+    expect(find.text('Add receipt'), findsOneWidget);
     expect(find.text('DESPERATION INDEX'), findsOneWidget);
     expect(find.text('Monthly budget locked in'), findsOneWidget);
     expect(find.text('Fixed monthly costs'), findsOneWidget);
@@ -146,6 +149,7 @@ void main() {
     );
 
     expect(find.byTooltip('Expense actions'), findsOneWidget);
+    expect(find.byTooltip('Receipt attached'), findsOneWidget);
 
     await tester.scrollUntilVisible(
       find.text('View all'),

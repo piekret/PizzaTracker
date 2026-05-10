@@ -239,6 +239,17 @@ class _ExpenseRow extends StatelessWidget {
               fontFeatures: const [FontFeature.tabularFigures()],
             ),
           ),
+          if (expense.receiptId != null) ...[
+            const SizedBox(width: 6),
+            Tooltip(
+              message: 'Receipt attached',
+              child: Icon(
+                Icons.image_outlined,
+                size: 19,
+                color: context.palette.primaryGlow,
+              ),
+            ),
+          ],
           PopupMenuButton<String>(
             tooltip: 'Expense actions',
             onSelected: (value) {

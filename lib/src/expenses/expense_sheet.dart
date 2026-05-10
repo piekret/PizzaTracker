@@ -1,9 +1,10 @@
 part of '../pizza_tracker_app.dart';
 
 class AddExpenseSheet extends ConsumerStatefulWidget {
-  const AddExpenseSheet({this.expense, super.key});
+  const AddExpenseSheet({this.expense, this.receipt, super.key});
 
   final ExpenseItem? expense;
+  final ReceiptUpload? receipt;
 
   @override
   ConsumerState<AddExpenseSheet> createState() => _AddExpenseSheetState();
@@ -20,6 +21,8 @@ class _AddExpenseSheetState extends ConsumerState<AddExpenseSheet> {
   String? _error;
 
   bool get _isEditing => widget.expense != null;
+  String? get _attachedReceiptId =>
+      widget.receipt?.id ?? widget.expense?.receiptId;
 
   @override
   void initState() {
@@ -64,6 +67,7 @@ class _AddExpenseSheetState extends ConsumerState<AddExpenseSheet> {
           amount: amount,
           category: _category,
           expenseDate: _expenseDate,
+          receiptId: widget.receipt?.id,
         );
       } else {
         await repository.updateExpense(
@@ -72,6 +76,7 @@ class _AddExpenseSheetState extends ConsumerState<AddExpenseSheet> {
           amount: amount,
           category: _category,
           expenseDate: _expenseDate,
+          receiptId: widget.receipt?.id,
         );
       }
       if (mounted) {
@@ -168,6 +173,10 @@ class _AddExpenseSheetState extends ConsumerState<AddExpenseSheet> {
               icon: const Icon(Icons.calendar_today_outlined),
               label: Text(DateFormat.yMMMd().format(_expenseDate)),
             ),
+            if (_attachedReceiptId != null) ...[
+              const SizedBox(height: 12),
+              _AttachedReceiptNotice(isNewUpload: widget.receipt != null),
+            ],
             if (_error != null) ...[
               const SizedBox(height: 12),
               _InlineError(message: _error!),
@@ -184,6 +193,40 @@ class _AddExpenseSheetState extends ConsumerState<AddExpenseSheet> {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _AttachedReceiptNotice extends StatelessWidget {
+  const _AttachedReceiptNotice({required this.isNewUpload});
+
+  final bool isNewUpload;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: context.palette.primaryGlow.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: context.palette.border),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.image_outlined, color: context.palette.primaryGlow),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              isNewUpload
+                  ? 'Receipt uploaded. Save the expense to attach it.'
+                  : 'Receipt attached to this expense.',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

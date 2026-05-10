@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -42,6 +44,7 @@ final incomeEventsProvider = FutureProvider<List<IncomeEvent>>((ref) async {
 });
 
 const expenseCategories = ['food', 'alcohol', 'hygiene', 'fun', 'other'];
+const receiptImagesBucket = 'receipt-images';
 
 class AppRepository {
   AppRepository(this._client);
@@ -126,7 +129,9 @@ class AppRepository {
 
     final rows = await _client
         .from('expense_items')
-        .select('id, name, amount, category, expense_date, created_at')
+        .select(
+          'id, receipt_id, name, amount, category, expense_date, created_at',
+        )
         .order('expense_date', ascending: false)
         .order('created_at', ascending: false)
         .limit(12);
@@ -141,7 +146,9 @@ class AppRepository {
 
     final rows = await _client
         .from('expense_items')
-        .select('id, name, amount, category, expense_date, created_at')
+        .select(
+          'id, receipt_id, name, amount, category, expense_date, created_at',
+        )
         .eq('user_id', user.id)
         .order('expense_date', ascending: false)
         .order('created_at', ascending: false);
@@ -240,17 +247,22 @@ class AppRepository {
     required double amount,
     required String category,
     required DateTime expenseDate,
+    String? receiptId,
   }) async {
     final user = _requireUser();
-
-    await _client.from('expense_items').insert({
+    final values = <String, Object?>{
       'user_id': user.id,
       'name': name.trim(),
       'amount': amount,
       'category': category,
       'ai_categorized': false,
       'expense_date': DateFormat('yyyy-MM-dd').format(expenseDate),
-    });
+    };
+    if (receiptId != null) {
+      values['receipt_id'] = receiptId;
+    }
+
+    await _client.from('expense_items').insert(values);
   }
 
   Future<void> updateExpense({
@@ -259,18 +271,98 @@ class AppRepository {
     required double amount,
     required String category,
     required DateTime expenseDate,
+    String? receiptId,
   }) async {
     final user = _requireUser();
+    final values = <String, Object?>{
+      'name': name.trim(),
+      'amount': amount,
+      'category': category,
+      'expense_date': DateFormat('yyyy-MM-dd').format(expenseDate),
+    };
+    if (receiptId != null) {
+      values['receipt_id'] = receiptId;
+    }
 
     await _client
         .from('expense_items')
-        .update({
-          'name': name.trim(),
-          'amount': amount,
-          'category': category,
-          'expense_date': DateFormat('yyyy-MM-dd').format(expenseDate),
-        })
+        .update(values)
         .eq('id', id)
+        .eq('user_id', user.id);
+  }
+
+  Future<ReceiptUpload> createReceiptUpload({
+    required Uint8List bytes,
+    required String originalName,
+    String? mimeType,
+  }) async {
+    final user = _requireUser();
+    final inserted = await _client
+        .from('receipts')
+        .insert({
+          'user_id': user.id,
+          'total_amount': 0,
+          'scanned_at': DateTime.now().toUtc().toIso8601String(),
+        })
+        .select('id, store_name, total_amount, image_path, scanned_at')
+        .single();
+    final receipt = ReceiptUpload.fromMap(Map<String, dynamic>.from(inserted));
+    final extension = _receiptExtension(originalName, mimeType);
+    final path =
+        '${user.id}/${receipt.id}/${DateTime.now().millisecondsSinceEpoch}$extension';
+
+    var uploadedPath = false;
+    try {
+      await _client.storage
+          .from(receiptImagesBucket)
+          .uploadBinary(
+            path,
+            bytes,
+            fileOptions: FileOptions(
+              cacheControl: '3600',
+              contentType: _receiptContentType(extension, mimeType),
+            ),
+          );
+      uploadedPath = true;
+
+      final updated = await _client
+          .from('receipts')
+          .update({'image_path': path})
+          .eq('id', receipt.id)
+          .eq('user_id', user.id)
+          .select('id, store_name, total_amount, image_path, scanned_at')
+          .single();
+
+      return ReceiptUpload.fromMap(Map<String, dynamic>.from(updated));
+    } catch (_) {
+      if (uploadedPath) {
+        try {
+          await _client.storage.from(receiptImagesBucket).remove([path]);
+        } catch (_) {
+          // Preserve the original upload/update error.
+        }
+      }
+      try {
+        await _client.from('receipts').delete().eq('id', receipt.id);
+      } catch (_) {
+        // Preserve the original upload/update error.
+      }
+      rethrow;
+    }
+  }
+
+  Future<void> deleteReceiptUpload(ReceiptUpload receipt) async {
+    final user = _requireUser();
+    final imagePath = receipt.imagePath;
+
+    if (imagePath != null && imagePath.isNotEmpty) {
+      await _client.storage.from(receiptImagesBucket).remove([imagePath]);
+    }
+
+    await _client
+        .from('receipts')
+        .delete()
+        .eq('id', receipt.id)
         .eq('user_id', user.id);
   }
 
@@ -409,9 +501,11 @@ class ExpenseItem {
     required this.amount,
     required this.category,
     required this.expenseDate,
+    this.receiptId,
   });
 
   final String id;
+  final String? receiptId;
   final String name;
   final double amount;
   final String category;
@@ -420,10 +514,37 @@ class ExpenseItem {
   factory ExpenseItem.fromMap(Map<String, dynamic> map) {
     return ExpenseItem(
       id: map['id'] as String,
+      receiptId: map['receipt_id'] as String?,
       name: map['name'] as String,
       amount: _toDouble(map['amount']),
       category: (map['category'] as String?) ?? 'other',
       expenseDate: DateTime.parse(map['expense_date'] as String),
+    );
+  }
+}
+
+class ReceiptUpload {
+  const ReceiptUpload({
+    required this.id,
+    required this.totalAmount,
+    required this.scannedAt,
+    this.storeName,
+    this.imagePath,
+  });
+
+  final String id;
+  final String? storeName;
+  final double totalAmount;
+  final String? imagePath;
+  final DateTime scannedAt;
+
+  factory ReceiptUpload.fromMap(Map<String, dynamic> map) {
+    return ReceiptUpload(
+      id: map['id'] as String,
+      storeName: map['store_name'] as String?,
+      totalAmount: _toDouble(map['total_amount']),
+      imagePath: map['image_path'] as String?,
+      scannedAt: DateTime.parse(map['scanned_at'] as String),
     );
   }
 }
@@ -520,6 +641,28 @@ bool _toBool(Object? value) {
     return value != 0;
   }
   return value?.toString().toLowerCase() == 'true';
+}
+
+String _receiptExtension(String originalName, String? mimeType) {
+  final lowerName = originalName.toLowerCase();
+  if (lowerName.endsWith('.png') || mimeType == 'image/png') {
+    return '.png';
+  }
+  if (lowerName.endsWith('.webp') || mimeType == 'image/webp') {
+    return '.webp';
+  }
+  return '.jpg';
+}
+
+String _receiptContentType(String extension, String? mimeType) {
+  if (mimeType != null && mimeType.startsWith('image/')) {
+    return mimeType;
+  }
+  return switch (extension) {
+    '.png' => 'image/png',
+    '.webp' => 'image/webp',
+    _ => 'image/jpeg',
+  };
 }
 
 class _BudgetPeriod {

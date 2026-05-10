@@ -30,10 +30,28 @@ class _ExpenseHistoryScreenState extends ConsumerState<ExpenseHistoryScreen> {
 
     return Scaffold(
       backgroundColor: Colors.transparent,
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _showAddExpense(context),
-        icon: const Icon(Icons.add_rounded),
-        label: const Text('Add expense'),
+      floatingActionButton: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          FloatingActionButton.extended(
+            heroTag: 'history-add-receipt',
+            onPressed: () => showReceiptUploadFlow(
+              context: context,
+              ref: ref,
+              onExpenseSaved: _invalidateExpenseData,
+            ),
+            icon: const Icon(Icons.document_scanner_outlined),
+            label: const Text('Add receipt'),
+          ),
+          const SizedBox(height: 10),
+          FloatingActionButton.extended(
+            heroTag: 'history-add-expense',
+            onPressed: () => _showAddExpense(context),
+            icon: const Icon(Icons.add_rounded),
+            label: const Text('Add expense'),
+          ),
+        ],
       ),
       body: AppBackground(
         child: SafeArea(
@@ -64,7 +82,7 @@ class _ExpenseHistoryScreenState extends ConsumerState<ExpenseHistoryScreen> {
                       onRefresh: _refresh,
                       child: ListView(
                         physics: const AlwaysScrollableScrollPhysics(),
-                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 110),
+                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 150),
                         children: [
                           _HistorySummary(
                             count: filtered.length,

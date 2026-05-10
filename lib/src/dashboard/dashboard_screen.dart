@@ -15,17 +15,35 @@ class DashboardScreen extends ConsumerWidget {
 
     return Scaffold(
       backgroundColor: Colors.transparent,
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _showAddExpense(context, ref),
-        icon: const Icon(Icons.add_rounded),
-        label: const Text('Add expense'),
+      floatingActionButton: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          FloatingActionButton.extended(
+            heroTag: 'dashboard-add-receipt',
+            onPressed: () => showReceiptUploadFlow(
+              context: context,
+              ref: ref,
+              onExpenseSaved: () => _invalidateExpenseData(ref),
+            ),
+            icon: const Icon(Icons.document_scanner_outlined),
+            label: const Text('Add receipt'),
+          ),
+          const SizedBox(height: 10),
+          FloatingActionButton.extended(
+            heroTag: 'dashboard-add-expense',
+            onPressed: () => _showAddExpense(context, ref),
+            icon: const Icon(Icons.add_rounded),
+            label: const Text('Add expense'),
+          ),
+        ],
       ),
       body: AppBackground(
         child: SafeArea(
           child: RefreshIndicator(
             onRefresh: () => _refresh(ref),
             child: ListView(
-              padding: const EdgeInsets.fromLTRB(16, 14, 16, 110),
+              padding: const EdgeInsets.fromLTRB(16, 14, 16, 150),
               children: [
                 _DashboardHeader(
                   onSignOut: () =>
@@ -121,11 +139,15 @@ class DashboardScreen extends ConsumerWidget {
     );
 
     if (saved == true && context.mounted) {
-      ref.invalidate(budgetSnapshotProvider);
-      ref.invalidate(recentExpensesProvider);
-      ref.invalidate(expenseHistoryProvider);
-      ref.invalidate(categorySpendingProvider);
+      _invalidateExpenseData(ref);
     }
+  }
+
+  void _invalidateExpenseData(WidgetRef ref) {
+    ref.invalidate(budgetSnapshotProvider);
+    ref.invalidate(recentExpensesProvider);
+    ref.invalidate(expenseHistoryProvider);
+    ref.invalidate(categorySpendingProvider);
   }
 }
 

@@ -28,6 +28,12 @@ class _RecentExpensesCard extends ConsumerWidget {
                   ],
                 ),
               ),
+              TextButton.icon(
+                onPressed: () => _showExpenseHistory(context),
+                icon: const Icon(Icons.history_rounded),
+                label: const Text('View all'),
+              ),
+              const SizedBox(width: 8),
               SoftPill(label: '${expenses.length} shown'),
             ],
           ),
@@ -67,8 +73,17 @@ class _RecentExpensesCard extends ConsumerWidget {
     if (saved == true && context.mounted) {
       ref.invalidate(budgetSnapshotProvider);
       ref.invalidate(recentExpensesProvider);
+      ref.invalidate(expenseHistoryProvider);
       ref.invalidate(categorySpendingProvider);
     }
+  }
+
+  void _showExpenseHistory(BuildContext context) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => ExpenseHistoryScreen(currency: currency),
+      ),
+    );
   }
 
   Future<void> _deleteExpense(
@@ -109,6 +124,7 @@ class _RecentExpensesCard extends ConsumerWidget {
       }
       ref.invalidate(budgetSnapshotProvider);
       ref.invalidate(recentExpensesProvider);
+      ref.invalidate(expenseHistoryProvider);
       ref.invalidate(categorySpendingProvider);
     } catch (error) {
       if (!context.mounted) {

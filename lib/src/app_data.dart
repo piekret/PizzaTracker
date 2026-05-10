@@ -22,6 +22,10 @@ final recentExpensesProvider = FutureProvider<List<ExpenseItem>>((ref) async {
   return ref.watch(appRepositoryProvider).getRecentExpenses();
 });
 
+final expenseHistoryProvider = FutureProvider<List<ExpenseItem>>((ref) async {
+  return ref.watch(appRepositoryProvider).getExpenseHistory();
+});
+
 final categorySpendingProvider = FutureProvider<List<CategorySpending>>((
   ref,
 ) async {
@@ -126,6 +130,21 @@ class AppRepository {
         .order('expense_date', ascending: false)
         .order('created_at', ascending: false)
         .limit(12);
+
+    return rows
+        .map((row) => ExpenseItem.fromMap(Map<String, dynamic>.from(row)))
+        .toList();
+  }
+
+  Future<List<ExpenseItem>> getExpenseHistory() async {
+    final user = _requireUser();
+
+    final rows = await _client
+        .from('expense_items')
+        .select('id, name, amount, category, expense_date, created_at')
+        .eq('user_id', user.id)
+        .order('expense_date', ascending: false)
+        .order('created_at', ascending: false);
 
     return rows
         .map((row) => ExpenseItem.fromMap(Map<String, dynamic>.from(row)))

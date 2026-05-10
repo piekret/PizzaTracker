@@ -61,6 +61,24 @@ void main() {
               ),
             ];
           }),
+          expenseHistoryProvider.overrideWith((ref) async {
+            return [
+              ExpenseItem(
+                id: 'expense-id',
+                name: 'Test pizza',
+                amount: 19.99,
+                category: 'food',
+                expenseDate: DateTime(2026, 5, 9),
+              ),
+              ExpenseItem(
+                id: 'expense-soap',
+                name: 'Soap',
+                amount: 7.5,
+                category: 'hygiene',
+                expenseDate: DateTime(2026, 5, 8),
+              ),
+            ];
+          }),
           categorySpendingProvider.overrideWith((ref) async {
             return const [
               CategorySpending(category: 'food', amount: 45, itemCount: 2),
@@ -128,5 +146,18 @@ void main() {
     );
 
     expect(find.byTooltip('Expense actions'), findsOneWidget);
+
+    await tester.scrollUntilVisible(
+      find.text('View all'),
+      500,
+      scrollable: find.byType(Scrollable),
+    );
+    await tester.tap(find.text('View all'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Expense history'), findsOneWidget);
+    expect(find.text('Search expenses'), findsOneWidget);
+    expect(find.text('2 expenses'), findsOneWidget);
+    expect(find.text('Soap'), findsOneWidget);
   });
 }

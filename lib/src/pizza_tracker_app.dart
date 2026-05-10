@@ -15,6 +15,7 @@ part 'dashboard/dashboard_screen.dart';
 part 'dashboard/desperation_card.dart';
 part 'dashboard/edit_budget_sheet.dart';
 part 'dashboard/planning_cards.dart';
+part 'expenses/expense_history_screen.dart';
 part 'expenses/expense_sheet.dart';
 part 'expenses/recent_expenses_card.dart';
 part 'planning/planning_sheets.dart';

@@ -96,6 +96,7 @@ class DashboardScreen extends ConsumerWidget {
     ref.invalidate(userProfileProvider);
     ref.invalidate(budgetSnapshotProvider);
     ref.invalidate(recentExpensesProvider);
+    ref.invalidate(expenseHistoryProvider);
     ref.invalidate(categorySpendingProvider);
     ref.invalidate(fixedExpensesProvider);
     ref.invalidate(incomeEventsProvider);
@@ -122,6 +123,7 @@ class DashboardScreen extends ConsumerWidget {
     if (saved == true && context.mounted) {
       ref.invalidate(budgetSnapshotProvider);
       ref.invalidate(recentExpensesProvider);
+      ref.invalidate(expenseHistoryProvider);
       ref.invalidate(categorySpendingProvider);
     }
   }

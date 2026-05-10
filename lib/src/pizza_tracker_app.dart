@@ -19,6 +19,7 @@ part 'dashboard/planning_cards.dart';
 part 'expenses/expense_history_screen.dart';
 part 'expenses/expense_sheet.dart';
 part 'expenses/recent_expenses_card.dart';
+part 'expenses/receipt_preview_sheet.dart';
 part 'expenses/receipt_upload_flow.dart';
 part 'planning/planning_sheets.dart';
 part 'shared/setup_screen.dart';

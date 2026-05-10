@@ -149,7 +149,7 @@ void main() {
     );
 
     expect(find.byTooltip('Expense actions'), findsOneWidget);
-    expect(find.byTooltip('Receipt attached'), findsOneWidget);
+    expect(find.byTooltip('Open receipt'), findsOneWidget);
 
     await tester.scrollUntilVisible(
       find.text('View all'),

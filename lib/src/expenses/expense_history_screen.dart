@@ -100,6 +100,12 @@ class _ExpenseHistoryScreenState extends ConsumerState<ExpenseHistoryScreen> {
                                     _showEditExpense(context, expense),
                                 onDelete: () =>
                                     _deleteExpense(context, expense),
+                                onOpenReceipt: expense.receiptId == null
+                                    ? null
+                                    : () => showReceiptPreview(
+                                        context: context,
+                                        receiptId: expense.receiptId!,
+                                      ),
                               ),
                               if (expense != filtered.last)
                                 const SizedBox(height: 10),

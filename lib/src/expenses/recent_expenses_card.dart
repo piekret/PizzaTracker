@@ -49,6 +49,12 @@ class _RecentExpensesCard extends ConsumerWidget {
                 ).format(expense.amount),
                 onEdit: () => _showEditExpense(context, ref, expense),
                 onDelete: () => _deleteExpense(context, ref, expense),
+                onOpenReceipt: expense.receiptId == null
+                    ? null
+                    : () => showReceiptPreview(
+                        context: context,
+                        receiptId: expense.receiptId!,
+                      ),
               ),
               if (expense != expenses.last) const SizedBox(height: 10),
             ],
@@ -180,12 +186,14 @@ class _ExpenseRow extends StatelessWidget {
     required this.amount,
     required this.onEdit,
     required this.onDelete,
+    this.onOpenReceipt,
   });
 
   final ExpenseItem expense;
   final String amount;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
+  final VoidCallback? onOpenReceipt;
 
   @override
   Widget build(BuildContext context) {
@@ -241,9 +249,10 @@ class _ExpenseRow extends StatelessWidget {
           ),
           if (expense.receiptId != null) ...[
             const SizedBox(width: 6),
-            Tooltip(
-              message: 'Receipt attached',
-              child: Icon(
+            IconButton(
+              tooltip: 'Open receipt',
+              onPressed: onOpenReceipt,
+              icon: Icon(
                 Icons.image_outlined,
                 size: 19,
                 color: context.palette.primaryGlow,

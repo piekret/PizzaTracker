@@ -28,6 +28,20 @@ final expenseHistoryProvider = FutureProvider<List<ExpenseItem>>((ref) async {
   return ref.watch(appRepositoryProvider).getExpenseHistory();
 });
 
+final receiptUploadProvider = FutureProvider.family<ReceiptUpload, String>((
+  ref,
+  receiptId,
+) async {
+  return ref.watch(appRepositoryProvider).getReceiptUpload(receiptId);
+});
+
+final receiptImageUrlProvider = FutureProvider.family<String, String>((
+  ref,
+  imagePath,
+) async {
+  return ref.watch(appRepositoryProvider).createReceiptImageUrl(imagePath);
+});
+
 final categorySpendingProvider = FutureProvider<List<CategorySpending>>((
   ref,
 ) async {
@@ -364,6 +378,26 @@ class AppRepository {
         .delete()
         .eq('id', receipt.id)
         .eq('user_id', user.id);
+  }
+
+  Future<ReceiptUpload> getReceiptUpload(String receiptId) async {
+    final user = _requireUser();
+
+    final row = await _client
+        .from('receipts')
+        .select('id, store_name, total_amount, image_path, scanned_at')
+        .eq('id', receiptId)
+        .eq('user_id', user.id)
+        .single();
+
+    return ReceiptUpload.fromMap(Map<String, dynamic>.from(row));
+  }
+
+  Future<String> createReceiptImageUrl(String imagePath) async {
+    _requireUser();
+    return _client.storage
+        .from(receiptImagesBucket)
+        .createSignedUrl(imagePath, 60 * 15);
   }
 
   Future<void> deleteExpense(String id) async {

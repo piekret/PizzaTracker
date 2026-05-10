@@ -22,6 +22,13 @@ final recentExpensesProvider = FutureProvider<List<ExpenseItem>>((ref) async {
   return ref.watch(appRepositoryProvider).getRecentExpenses();
 });
 
+final categorySpendingProvider = FutureProvider<List<CategorySpending>>((
+  ref,
+) async {
+  final profile = await ref.watch(userProfileProvider.future);
+  return ref.watch(appRepositoryProvider).getCategorySpending(profile: profile);
+});
+
 final fixedExpensesProvider = FutureProvider<List<FixedExpense>>((ref) async {
   return ref.watch(appRepositoryProvider).getFixedExpenses();
 });
@@ -123,6 +130,62 @@ class AppRepository {
     return rows
         .map((row) => ExpenseItem.fromMap(Map<String, dynamic>.from(row)))
         .toList();
+  }
+
+  Future<List<CategorySpending>> getCategorySpending({
+    required UserProfile profile,
+    DateTime? onDate,
+  }) async {
+    final user = _requireUser();
+    final period = _budgetPeriodFor(
+      onDate ?? DateTime.now(),
+      profile.budgetResetDay,
+    );
+    final dateFormat = DateFormat('yyyy-MM-dd');
+    final amountByCategory = <String, double>{};
+    final countByCategory = <String, int>{};
+
+    final rows = await _client
+        .from('expense_items')
+        .select('category, amount')
+        .eq('user_id', user.id)
+        .gte('expense_date', dateFormat.format(period.start))
+        .lte('expense_date', dateFormat.format(period.end));
+
+    for (final row in rows) {
+      final map = Map<String, dynamic>.from(row);
+      final rawCategory = (map['category'] as String?) ?? 'other';
+      final category = expenseCategories.contains(rawCategory)
+          ? rawCategory
+          : 'other';
+
+      amountByCategory[category] =
+          (amountByCategory[category] ?? 0) + _toDouble(map['amount']);
+      countByCategory[category] = (countByCategory[category] ?? 0) + 1;
+    }
+
+    final spending = amountByCategory.entries
+        .where((entry) => entry.value > 0)
+        .map(
+          (entry) => CategorySpending(
+            category: entry.key,
+            amount: entry.value,
+            itemCount: countByCategory[entry.key] ?? 0,
+          ),
+        )
+        .toList();
+
+    spending.sort((a, b) {
+      final amountComparison = b.amount.compareTo(a.amount);
+      if (amountComparison != 0) {
+        return amountComparison;
+      }
+      return expenseCategories
+          .indexOf(a.category)
+          .compareTo(expenseCategories.indexOf(b.category));
+    });
+
+    return spending;
   }
 
   Future<List<FixedExpense>> getFixedExpenses() async {
@@ -346,6 +409,18 @@ class ExpenseItem {
   }
 }
 
+class CategorySpending {
+  const CategorySpending({
+    required this.category,
+    required this.amount,
+    required this.itemCount,
+  });
+
+  final String category;
+  final double amount;
+  final int itemCount;
+}
+
 class FixedExpense {
   const FixedExpense({
     required this.id,
@@ -426,4 +501,30 @@ bool _toBool(Object? value) {
     return value != 0;
   }
   return value?.toString().toLowerCase() == 'true';
+}
+
+class _BudgetPeriod {
+  const _BudgetPeriod({required this.start, required this.end});
+
+  final DateTime start;
+  final DateTime end;
+}
+
+_BudgetPeriod _budgetPeriodFor(DateTime date, int resetDay) {
+  final normalizedResetDay = resetDay.clamp(1, 28);
+  final periodMonth = date.day < normalizedResetDay
+      ? DateTime(date.year, date.month - 1)
+      : DateTime(date.year, date.month);
+  final start = DateTime(
+    periodMonth.year,
+    periodMonth.month,
+    normalizedResetDay,
+  );
+  final end = DateTime(
+    periodMonth.year,
+    periodMonth.month + 1,
+    normalizedResetDay,
+  ).subtract(const Duration(days: 1));
+
+  return _BudgetPeriod(start: start, end: end);
 }

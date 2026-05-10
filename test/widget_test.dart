@@ -61,6 +61,12 @@ void main() {
               ),
             ];
           }),
+          categorySpendingProvider.overrideWith((ref) async {
+            return const [
+              CategorySpending(category: 'food', amount: 45, itemCount: 2),
+              CategorySpending(category: 'hygiene', amount: 15, itemCount: 1),
+            ];
+          }),
           fixedExpensesProvider.overrideWith((ref) async {
             return const [
               FixedExpense(
@@ -93,17 +99,27 @@ void main() {
 
     await tester.pumpAndSettle();
 
+    expect(find.text('DESPERATION INDEX'), findsOneWidget);
     expect(find.text('Monthly budget locked in'), findsOneWidget);
     expect(find.text('Fixed monthly costs'), findsOneWidget);
-    expect(find.text('Expected income'), findsOneWidget);
 
     await tester.scrollUntilVisible(
-      find.text('DESPERATION INDEX'),
+      find.text('Expected income'),
       500,
       scrollable: find.byType(Scrollable),
     );
 
-    expect(find.text('DESPERATION INDEX'), findsOneWidget);
+    expect(find.text('Expected income'), findsOneWidget);
+
+    await tester.scrollUntilVisible(
+      find.text('Spending mix'),
+      500,
+      scrollable: find.byType(Scrollable),
+    );
+
+    expect(find.text('Spending mix'), findsOneWidget);
+    expect(find.text('Food'), findsOneWidget);
+    expect(find.text('75% of variable spending - 2 items'), findsOneWidget);
 
     await tester.scrollUntilVisible(
       find.text('Test pizza'),

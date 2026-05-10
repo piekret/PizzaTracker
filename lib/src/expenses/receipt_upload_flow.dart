@@ -32,6 +32,8 @@ Future<void> showReceiptUploadFlow({
   _showReceiptUploadingDialog(context);
 
   ReceiptUpload? receipt;
+  ReceiptAnalysis? analysis;
+  Object? analysisError;
   try {
     final bytes = await image.readAsBytes();
     receipt = await ref
@@ -42,6 +44,14 @@ Future<void> showReceiptUploadFlow({
           mimeType: image.mimeType,
         );
 
+    try {
+      analysis = await ref
+          .read(appRepositoryProvider)
+          .analyzeReceipt(receipt.id);
+    } catch (error) {
+      analysisError = error;
+    }
+
     if (context.mounted) {
       Navigator.of(context, rootNavigator: true).pop();
       isUploadingDialogOpen = false;
@@ -49,13 +59,23 @@ Future<void> showReceiptUploadFlow({
     if (!context.mounted) {
       return;
     }
+    if (analysisError != null) {
+      messenger.showSnackBar(
+        SnackBar(content: Text(_receiptAnalysisFallbackMessage(analysisError))),
+      );
+    }
 
     final saved = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => AddExpenseSheet(receipt: receipt),
+      builder: (context) => AddExpenseSheet(
+        receipt: receipt,
+        receiptAnalysis: analysis?.hasUsefulSuggestion == true
+            ? analysis
+            : null,
+      ),
     );
 
     if (saved == true) {
@@ -109,6 +129,16 @@ String _receiptPickerError(Object error) {
   return message;
 }
 
+String _receiptAnalysisFallbackMessage(Object error) {
+  final message = error.toString();
+  if (message.contains('Function not found') ||
+      message.contains('not configured') ||
+      message.contains('analyze-receipt')) {
+    return 'Receipt uploaded. Manual entry is ready; deploy receipt analysis to enable autofill.';
+  }
+  return 'Receipt uploaded, but automatic reading is unavailable. Fill the expense manually.';
+}
+
 void _showReceiptUploadingDialog(BuildContext context) {
   showDialog<void>(
     context: context,
@@ -124,7 +154,7 @@ void _showReceiptUploadingDialog(BuildContext context) {
             const SizedBox(width: 14),
             Expanded(
               child: Text(
-                'Uploading receipt...',
+                'Uploading and reading receipt...',
                 style: Theme.of(context).textTheme.bodyMedium,
               ),
             ),

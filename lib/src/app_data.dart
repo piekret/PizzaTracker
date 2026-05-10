@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -400,6 +401,21 @@ class AppRepository {
         .createSignedUrl(imagePath, 60 * 15);
   }
 
+  Future<ReceiptAnalysis> analyzeReceipt(String receiptId) async {
+    _requireUser();
+    final response = await _client.functions.invoke(
+      'analyze-receipt',
+      body: {'receiptId': receiptId},
+    );
+
+    final map = _responseMap(response.data);
+    final error = map['error'];
+    if (error != null) {
+      throw StateError(error.toString());
+    }
+    return ReceiptAnalysis.fromMap(map);
+  }
+
   Future<void> deleteExpense(String id) async {
     final user = _requireUser();
 
@@ -583,6 +599,48 @@ class ReceiptUpload {
   }
 }
 
+class ReceiptAnalysis {
+  const ReceiptAnalysis({
+    this.storeName,
+    this.totalAmount,
+    this.expenseDate,
+    this.category,
+    this.description,
+    this.confidence,
+  });
+
+  final String? storeName;
+  final double? totalAmount;
+  final DateTime? expenseDate;
+  final String? category;
+  final String? description;
+  final double? confidence;
+
+  factory ReceiptAnalysis.fromMap(Map<String, dynamic> map) {
+    final amount = map['totalAmount'] ?? map['total_amount'];
+    final rawDate = map['expenseDate'] ?? map['expense_date'];
+    final rawCategory = map['category'] as String?;
+
+    return ReceiptAnalysis(
+      storeName: _blankToNull(map['storeName'] ?? map['store_name']),
+      totalAmount: amount == null ? null : _toDouble(amount),
+      expenseDate: rawDate == null ? null : DateTime.tryParse('$rawDate'),
+      category: expenseCategories.contains(rawCategory) ? rawCategory : null,
+      description: _blankToNull(map['description']),
+      confidence: map['confidence'] == null
+          ? null
+          : _toDouble(map['confidence']).clamp(0.0, 1.0).toDouble(),
+    );
+  }
+
+  bool get hasUsefulSuggestion =>
+      (description != null && description!.isNotEmpty) ||
+      (storeName != null && storeName!.isNotEmpty) ||
+      (totalAmount != null && totalAmount! > 0) ||
+      expenseDate != null ||
+      category != null;
+}
+
 class CategorySpending {
   const CategorySpending({
     required this.category,
@@ -675,6 +733,22 @@ bool _toBool(Object? value) {
     return value != 0;
   }
   return value?.toString().toLowerCase() == 'true';
+}
+
+Map<String, dynamic> _responseMap(Object? data) {
+  final decoded = data is String ? jsonDecode(data) : data;
+  if (decoded is Map) {
+    return Map<String, dynamic>.from(decoded);
+  }
+  throw StateError('Unexpected receipt analysis response.');
+}
+
+String? _blankToNull(Object? value) {
+  final text = value?.toString().trim();
+  if (text == null || text.isEmpty) {
+    return null;
+  }
+  return text;
 }
 
 String _receiptExtension(String originalName, String? mimeType) {

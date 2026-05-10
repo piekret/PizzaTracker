@@ -1,10 +1,16 @@
 part of '../pizza_tracker_app.dart';
 
 class AddExpenseSheet extends ConsumerStatefulWidget {
-  const AddExpenseSheet({this.expense, this.receipt, super.key});
+  const AddExpenseSheet({
+    this.expense,
+    this.receipt,
+    this.receiptAnalysis,
+    super.key,
+  });
 
   final ExpenseItem? expense;
   final ReceiptUpload? receipt;
+  final ReceiptAnalysis? receiptAnalysis;
 
   @override
   ConsumerState<AddExpenseSheet> createState() => _AddExpenseSheetState();
@@ -29,14 +35,25 @@ class _AddExpenseSheetState extends ConsumerState<AddExpenseSheet> {
     super.initState();
 
     final expense = widget.expense;
-    _nameController = TextEditingController(text: expense?.name ?? '');
+    final analysis = widget.receiptAnalysis;
+    final suggestedName = analysis?.description ?? analysis?.storeName ?? '';
+    final suggestedAmount = analysis?.totalAmount;
+
+    _nameController = TextEditingController(
+      text: expense?.name ?? suggestedName,
+    );
     _amountController = TextEditingController(
-      text: expense == null ? '' : expense.amount.toStringAsFixed(2),
+      text: expense == null
+          ? suggestedAmount == null || suggestedAmount <= 0
+                ? ''
+                : suggestedAmount.toStringAsFixed(2)
+          : expense.amount.toStringAsFixed(2),
     );
     _category = expenseCategories.contains(expense?.category)
         ? expense!.category
-        : 'other';
-    _expenseDate = expense?.expenseDate ?? DateTime.now();
+        : analysis?.category ?? 'other';
+    _expenseDate =
+        expense?.expenseDate ?? analysis?.expenseDate ?? DateTime.now();
   }
 
   @override
@@ -175,7 +192,11 @@ class _AddExpenseSheetState extends ConsumerState<AddExpenseSheet> {
             ),
             if (_attachedReceiptId != null) ...[
               const SizedBox(height: 12),
-              _AttachedReceiptNotice(isNewUpload: widget.receipt != null),
+              _AttachedReceiptNotice(
+                isNewUpload: widget.receipt != null,
+                wasAnalyzed:
+                    widget.receiptAnalysis?.hasUsefulSuggestion == true,
+              ),
             ],
             if (_error != null) ...[
               const SizedBox(height: 12),
@@ -199,9 +220,13 @@ class _AddExpenseSheetState extends ConsumerState<AddExpenseSheet> {
 }
 
 class _AttachedReceiptNotice extends StatelessWidget {
-  const _AttachedReceiptNotice({required this.isNewUpload});
+  const _AttachedReceiptNotice({
+    required this.isNewUpload,
+    required this.wasAnalyzed,
+  });
 
   final bool isNewUpload;
+  final bool wasAnalyzed;
 
   @override
   Widget build(BuildContext context) {
@@ -218,7 +243,9 @@ class _AttachedReceiptNotice extends StatelessWidget {
           const SizedBox(width: 10),
           Expanded(
             child: Text(
-              isNewUpload
+              wasAnalyzed
+                  ? 'Receipt uploaded and suggestions were applied. Check before saving.'
+                  : isNewUpload
                   ? 'Receipt uploaded. Save the expense to attach it.'
                   : 'Receipt attached to this expense.',
               style: Theme.of(context).textTheme.bodySmall?.copyWith(

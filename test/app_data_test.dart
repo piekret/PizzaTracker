@@ -41,4 +41,30 @@ void main() {
       expect(analysis.hasUsefulSuggestion, isFalse);
     });
   });
+
+  group('ReceiptUpload', () {
+    test('parses persisted analysis metadata', () {
+      final receipt = ReceiptUpload.fromMap({
+        'id': 'receipt-id',
+        'store_name': 'Pizza Place',
+        'total_amount': 42.5,
+        'raw_ocr_text': 'Pizza Place total 42.50',
+        'analysis_json': {
+          'storeName': 'Pizza Place',
+          'totalAmount': 42.5,
+          'expenseDate': '2026-05-10',
+          'category': 'food',
+          'description': 'Pizza Place dinner',
+          'confidence': 0.82,
+        },
+        'image_path': 'user-id/receipt-id/image.jpg',
+        'scanned_at': '2026-05-10T12:00:00Z',
+      });
+
+      expect(receipt.rawOcrText, 'Pizza Place total 42.50');
+      expect(receipt.analysis?.description, 'Pizza Place dinner');
+      expect(receipt.analysis?.category, 'food');
+      expect(receipt.analysis?.hasUsefulSuggestion, isTrue);
+    });
+  });
 }

@@ -60,6 +60,8 @@ final incomeEventsProvider = FutureProvider<List<IncomeEvent>>((ref) async {
 
 const expenseCategories = ['food', 'alcohol', 'hygiene', 'fun', 'other'];
 const receiptImagesBucket = 'receipt-images';
+const _receiptSelectColumns =
+    'id, store_name, total_amount, raw_ocr_text, analysis_json, image_path, scanned_at';
 
 class AppRepository {
   AppRepository(this._client);
@@ -319,7 +321,7 @@ class AppRepository {
           'total_amount': 0,
           'scanned_at': DateTime.now().toUtc().toIso8601String(),
         })
-        .select('id, store_name, total_amount, image_path, scanned_at')
+        .select(_receiptSelectColumns)
         .single();
     final receipt = ReceiptUpload.fromMap(Map<String, dynamic>.from(inserted));
     final extension = _receiptExtension(originalName, mimeType);
@@ -345,7 +347,7 @@ class AppRepository {
           .update({'image_path': path})
           .eq('id', receipt.id)
           .eq('user_id', user.id)
-          .select('id, store_name, total_amount, image_path, scanned_at')
+          .select(_receiptSelectColumns)
           .single();
 
       return ReceiptUpload.fromMap(Map<String, dynamic>.from(updated));
@@ -386,7 +388,7 @@ class AppRepository {
 
     final row = await _client
         .from('receipts')
-        .select('id, store_name, total_amount, image_path, scanned_at')
+        .select(_receiptSelectColumns)
         .eq('id', receiptId)
         .eq('user_id', user.id)
         .single();
@@ -579,20 +581,30 @@ class ReceiptUpload {
     required this.totalAmount,
     required this.scannedAt,
     this.storeName,
+    this.rawOcrText,
+    this.analysis,
     this.imagePath,
   });
 
   final String id;
   final String? storeName;
   final double totalAmount;
+  final String? rawOcrText;
+  final ReceiptAnalysis? analysis;
   final String? imagePath;
   final DateTime scannedAt;
 
   factory ReceiptUpload.fromMap(Map<String, dynamic> map) {
+    final rawAnalysis = map['analysis_json'];
+
     return ReceiptUpload(
       id: map['id'] as String,
       storeName: map['store_name'] as String?,
       totalAmount: _toDouble(map['total_amount']),
+      rawOcrText: map['raw_ocr_text'] as String?,
+      analysis: rawAnalysis is Map
+          ? ReceiptAnalysis.fromMap(Map<String, dynamic>.from(rawAnalysis))
+          : null,
       imagePath: map['image_path'] as String?,
       scannedAt: DateTime.parse(map['scanned_at'] as String),
     );

@@ -118,6 +118,10 @@ class _ReceiptImagePreview extends StatelessWidget {
             color: Theme.of(context).colorScheme.onSurfaceVariant,
           ),
         ),
+        if (receipt.analysis?.hasUsefulSuggestion == true) ...[
+          const SizedBox(height: 12),
+          _ReceiptAnalysisSummary(analysis: receipt.analysis!),
+        ],
       ],
     );
   }

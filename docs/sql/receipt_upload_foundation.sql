@@ -4,6 +4,7 @@ create table if not exists public.receipts(
   store_name text,
   total_amount numeric(10,2) not null default 0,
   raw_ocr_text text,
+  analysis_json jsonb,
   scanned_at timestamptz not null default now(),
   image_path text,
   created_at timestamptz not null default now(),
@@ -13,6 +14,10 @@ create table if not exists public.receipts(
 
 alter table public.receipts
   alter column total_amount set default 0;
+
+alter table public.receipts
+  add column if not exists raw_ocr_text text,
+  add column if not exists analysis_json jsonb;
 
 alter table public.expense_items
   add column if not exists receipt_id uuid references public.receipts(id) on delete set null;

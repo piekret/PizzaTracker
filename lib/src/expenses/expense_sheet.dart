@@ -194,8 +194,7 @@ class _AddExpenseSheetState extends ConsumerState<AddExpenseSheet> {
               const SizedBox(height: 12),
               _AttachedReceiptNotice(
                 isNewUpload: widget.receipt != null,
-                wasAnalyzed:
-                    widget.receiptAnalysis?.hasUsefulSuggestion == true,
+                analysis: widget.receiptAnalysis,
               ),
             ],
             if (_error != null) ...[
@@ -222,14 +221,16 @@ class _AddExpenseSheetState extends ConsumerState<AddExpenseSheet> {
 class _AttachedReceiptNotice extends StatelessWidget {
   const _AttachedReceiptNotice({
     required this.isNewUpload,
-    required this.wasAnalyzed,
+    required this.analysis,
   });
 
   final bool isNewUpload;
-  final bool wasAnalyzed;
+  final ReceiptAnalysis? analysis;
 
   @override
   Widget build(BuildContext context) {
+    final wasAnalyzed = analysis?.hasUsefulSuggestion == true;
+
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -237,22 +238,84 @@ class _AttachedReceiptNotice extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: context.palette.border),
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(Icons.image_outlined, color: context.palette.primaryGlow),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              wasAnalyzed
-                  ? 'Receipt uploaded and suggestions were applied. Check before saving.'
-                  : isNewUpload
-                  ? 'Receipt uploaded. Save the expense to attach it.'
-                  : 'Receipt attached to this expense.',
+          Row(
+            children: [
+              Icon(Icons.image_outlined, color: context.palette.primaryGlow),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  wasAnalyzed
+                      ? 'Receipt uploaded and suggestions were applied. Check before saving.'
+                      : isNewUpload
+                      ? 'Receipt uploaded. Save the expense to attach it.'
+                      : 'Receipt attached to this expense.',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          if (wasAnalyzed) ...[
+            const SizedBox(height: 10),
+            _ReceiptAnalysisSummary(analysis: analysis!),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _ReceiptAnalysisSummary extends StatelessWidget {
+  const _ReceiptAnalysisSummary({required this.analysis});
+
+  final ReceiptAnalysis analysis;
+
+  @override
+  Widget build(BuildContext context) {
+    final details = [
+      if (analysis.storeName != null) analysis.storeName!,
+      if (analysis.category != null) _categoryLabel(analysis.category!),
+      if (analysis.expenseDate != null)
+        DateFormat.yMMMd().format(analysis.expenseDate!),
+    ];
+    final confidence = analysis.confidence;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: context.palette.surface.withValues(alpha: 0.64),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: context.palette.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Receipt analysis suggestions',
+                  style: Theme.of(context).textTheme.labelMedium,
+                ),
+              ),
+              if (confidence != null)
+                SoftPill(label: '${(confidence * 100).round()}% confidence'),
+            ],
+          ),
+          if (details.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Text(
+              details.join(' - '),
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                 color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
             ),
-          ),
+          ],
         ],
       ),
     );

@@ -114,6 +114,7 @@ serve(async (req) => {
         store_name: extracted.storeName,
         total_amount: extracted.totalAmount ?? 0,
         raw_ocr_text: extracted.rawText,
+        analysis_json: extracted,
       })
       .eq("id", receipt.id)
       .eq("user_id", user.id);

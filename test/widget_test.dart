@@ -164,4 +164,47 @@ void main() {
     expect(find.text('2 expenses'), findsOneWidget);
     expect(find.text('Soap'), findsOneWidget);
   });
+
+  testWidgets('prefills expense sheet from receipt analysis', (tester) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        child: MaterialApp(
+          theme: buildAppTheme(AppThemePreset.pizza),
+          home: Scaffold(
+            body: AddExpenseSheet(
+              receipt: ReceiptUpload(
+                id: 'receipt-id',
+                totalAmount: 42.5,
+                scannedAt: DateTime(2026, 5, 10),
+                imagePath: 'user-id/receipt-id/image.jpg',
+              ),
+              receiptAnalysis: ReceiptAnalysis(
+                storeName: 'Pizza Place',
+                totalAmount: 42.5,
+                expenseDate: DateTime(2026, 5, 10),
+                category: 'food',
+                description: 'Pizza Place dinner',
+                confidence: 0.82,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    final nameField = tester.widget<TextFormField>(
+      find.byType(TextFormField).at(0),
+    );
+    final amountField = tester.widget<TextFormField>(
+      find.byType(TextFormField).at(1),
+    );
+
+    expect(nameField.controller?.text, 'Pizza Place dinner');
+    expect(amountField.controller?.text, '42.50');
+    expect(find.text('Receipt analysis suggestions'), findsOneWidget);
+    expect(find.text('82% confidence'), findsOneWidget);
+    expect(find.textContaining('Pizza Place'), findsWidgets);
+  });
 }

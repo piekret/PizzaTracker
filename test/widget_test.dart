@@ -19,7 +19,10 @@ void main() {
 
     expect(find.text('PizzaTracker setup'), findsOneWidget);
     expect(
-      find.text('./scripts/sync_client_env.sh && flutter run'),
+      find.text(
+        'macOS/Linux: ./scripts/sync_client_env.sh && flutter run\n'
+        'Windows: powershell -ExecutionPolicy Bypass -File .\\scripts\\sync_client_env.ps1; flutter run',
+      ),
       findsOneWidget,
     );
   });

@@ -37,7 +37,9 @@ class SetupScreen extends StatelessWidget {
                       ),
                       const SizedBox(height: 22),
                       const _CommandBox(
-                        command: './scripts/sync_client_env.sh && flutter run',
+                        command:
+                            'macOS/Linux: ./scripts/sync_client_env.sh && flutter run\n'
+                            'Windows: powershell -ExecutionPolicy Bypass -File .\\scripts\\sync_client_env.ps1; flutter run',
                       ),
                       const SizedBox(height: 16),
                       Text(

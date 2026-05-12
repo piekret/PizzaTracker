@@ -2,6 +2,8 @@
 
 Flutter student budget tracker with Supabase auth/database integration.
 
+Receipts are read with local ML Kit OCR first, then categorized through a Supabase Edge Function so OpenAI keys never ship with the app.
+
 ## Local Setup
 
 Fill `.env` in the project root. For plain Flutter runs, the app reads client-safe Supabase values from generated `assets/env/client.env`.
@@ -49,4 +51,10 @@ flutter test
 
 ## Database
 
-The current MVP expects the Supabase schema from `docs/supabase-ai-prompt.md`, including `users_profiles`, `expense_items`, and the `get_budget_snapshot` RPC.
+The database schema is tracked in `supabase/migrations`. Apply it with the Supabase CLI from the project root:
+
+```bash
+supabase db push
+```
+
+The migration creates the app tables, RLS policies, receipt image bucket policies, dashboard views, and the `get_budget_snapshot` RPC. `docs/supabase-ai-prompt.md` remains a reference for the intended schema.

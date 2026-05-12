@@ -11,6 +11,10 @@ void main() {
         'category': 'food',
         'description': 'Pizza Place dinner',
         'confidence': 0.82,
+        'items': [
+          {'name': 'Margherita', 'amount': 32.5, 'category': 'food'},
+          {'name': 'Cola', 'amount': 10, 'category': 'other'},
+        ],
       });
 
       expect(analysis.storeName, 'Pizza Place');
@@ -19,7 +23,27 @@ void main() {
       expect(analysis.category, 'food');
       expect(analysis.description, 'Pizza Place dinner');
       expect(analysis.confidence, 0.82);
+      expect(analysis.items, hasLength(2));
+      expect(analysis.items.first.name, 'Margherita');
+      expect(analysis.items.first.amount, 32.5);
+      expect(analysis.items.first.category, 'food');
       expect(analysis.hasUsefulSuggestion, isTrue);
+    });
+
+    test('sanitizes invalid receipt line items', () {
+      final analysis = ReceiptAnalysis.fromMap({
+        'items': [
+          {'name': 'Soap', 'amount': 7.5, 'category': 'hygiene'},
+          {'name': '', 'amount': 2, 'category': 'food'},
+          {'name': 'Coupon', 'amount': -1, 'category': 'discount'},
+          {'name': 'Mystery', 'amount': 1.25, 'category': 'transport'},
+        ],
+      });
+
+      expect(analysis.items, hasLength(2));
+      expect(analysis.items.first.category, 'hygiene');
+      expect(analysis.items.last.name, 'Mystery');
+      expect(analysis.items.last.category, 'other');
     });
 
     test('ignores invalid categories and blank text', () {
@@ -56,6 +80,9 @@ void main() {
           'category': 'food',
           'description': 'Pizza Place dinner',
           'confidence': 0.82,
+          'items': [
+            {'name': 'Slice', 'amount': 12, 'category': 'food'},
+          ],
         },
         'image_path': 'user-id/receipt-id/image.jpg',
         'scanned_at': '2026-05-10T12:00:00Z',
@@ -64,6 +91,7 @@ void main() {
       expect(receipt.rawOcrText, 'Pizza Place total 42.50');
       expect(receipt.analysis?.description, 'Pizza Place dinner');
       expect(receipt.analysis?.category, 'food');
+      expect(receipt.analysis?.items.single.name, 'Slice');
       expect(receipt.analysis?.hasUsefulSuggestion, isTrue);
     });
   });

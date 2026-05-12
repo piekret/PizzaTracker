@@ -26,6 +26,10 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>PizzaTracker uses the camera to attach receipt photos to expenses.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>PizzaTracker lets you choose receipt images from your photo library.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

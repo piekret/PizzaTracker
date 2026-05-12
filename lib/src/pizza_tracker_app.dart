@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -20,6 +21,7 @@ part 'expenses/expense_history_screen.dart';
 part 'expenses/expense_sheet.dart';
 part 'expenses/recent_expenses_card.dart';
 part 'expenses/receipt_preview_sheet.dart';
+part 'expenses/receipt_review_sheet.dart';
 part 'expenses/receipt_upload_flow.dart';
 part 'planning/planning_sheets.dart';
 part 'shared/setup_screen.dart';

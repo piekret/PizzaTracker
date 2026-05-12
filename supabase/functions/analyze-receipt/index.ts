@@ -33,6 +33,23 @@ const receiptSchema = {
       minimum: 0,
       maximum: 1,
     },
+    items: {
+      type: "array",
+      description: "Visible receipt line items that should become expense rows.",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          name: { type: "string" },
+          amount: { type: "number" },
+          category: {
+            type: "string",
+            enum: ["food", "alcohol", "hygiene", "fun", "other"],
+          },
+        },
+        required: ["name", "amount", "category"],
+      },
+    },
   },
   required: [
     "storeName",
@@ -42,6 +59,7 @@ const receiptSchema = {
     "description",
     "rawText",
     "confidence",
+    "items",
   ],
 };
 
@@ -76,10 +94,11 @@ serve(async (req) => {
       return json({ error: "Invalid authorization token" }, 401);
     }
 
-    const { receiptId } = await req.json();
+    const { receiptId, rawText } = await req.json();
     if (typeof receiptId !== "string" || receiptId.length === 0) {
       return json({ error: "receiptId is required" }, 400);
     }
+    const localOcrText = typeof rawText === "string" ? rawText.trim() : "";
 
     const { data: receipt, error: receiptError } = await admin
       .from("receipts")
@@ -91,21 +110,26 @@ serve(async (req) => {
     if (receiptError || !receipt) {
       return json({ error: "Receipt not found" }, 404);
     }
-    if (!receipt.image_path) {
-      return json({ error: "Receipt has no image" }, 400);
-    }
+    let imageUrl: string | null = null;
+    if (!localOcrText) {
+      if (!receipt.image_path) {
+        return json({ error: "Receipt has no OCR text or image" }, 400);
+      }
 
-    const { data: signed, error: signedError } = await admin.storage
-      .from("receipt-images")
-      .createSignedUrl(receipt.image_path, 60 * 10);
+      const { data: signed, error: signedError } = await admin.storage
+        .from("receipt-images")
+        .createSignedUrl(receipt.image_path, 60 * 10);
 
-    if (signedError || !signed?.signedUrl) {
-      return json({ error: "Could not create receipt image URL" }, 500);
+      if (signedError || !signed?.signedUrl) {
+        return json({ error: "Could not create receipt image URL" }, 500);
+      }
+      imageUrl = signed.signedUrl;
     }
 
     const extracted = await analyzeWithOpenAi({
       apiKey: openAiKey,
-      imageUrl: signed.signedUrl,
+      rawText: localOcrText,
+      imageUrl,
     });
 
     await admin
@@ -113,7 +137,7 @@ serve(async (req) => {
       .update({
         store_name: extracted.storeName,
         total_amount: extracted.totalAmount ?? 0,
-        raw_ocr_text: extracted.rawText,
+        raw_ocr_text: (extracted.rawText ?? localOcrText) || null,
         analysis_json: extracted,
       })
       .eq("id", receipt.id)
@@ -127,14 +151,28 @@ serve(async (req) => {
 
 async function analyzeWithOpenAi({
   apiKey,
+  rawText,
   imageUrl,
 }: {
   apiKey: string;
-  imageUrl: string;
+  rawText: string;
+  imageUrl: string | null;
 }) {
   const model = Deno.env.get("OPENAI_RECEIPT_MODEL") ??
     Deno.env.get("OPENAI_MODEL") ??
     "gpt-4.1-mini";
+  const userContent: Array<Record<string, unknown>> = [
+    {
+      type: "input_text",
+      text: rawText
+        ? `Categorize this locally extracted receipt OCR text. Prefer real purchasable line items; ignore receipt metadata, payment lines, loyalty messages, taxes, and change due unless they are the only usable amount.\n\nReceipt OCR text:\n${clipText(rawText, 14000)}`
+        : "Extract this receipt into line items and app-ready expense fields.",
+    },
+  ];
+  if (imageUrl) {
+    userContent.push({ type: "input_image", image_url: imageUrl });
+  }
+
   const response = await fetch("https://api.openai.com/v1/responses", {
     method: "POST",
     headers: {
@@ -147,14 +185,11 @@ async function analyzeWithOpenAi({
         {
           role: "system",
           content:
-            "You extract receipt details for a student budgeting app. Return only fields allowed by the schema. Use the visible grand total, not subtotal. Pick the best category from food, alcohol, hygiene, fun, other.",
+            "You extract receipt details for a student budgeting app. Return only fields allowed by the schema. Use the visible grand total, not subtotal. For items, return purchasable line items with prices and categories from food, alcohol, hygiene, fun, other. If line items are unclear, return an empty items array and still provide the best single expense fields.",
         },
         {
           role: "user",
-          content: [
-            { type: "input_text", text: "Extract this receipt into app-ready expense fields." },
-            { type: "input_image", image_url: imageUrl },
-          ],
+          content: userContent,
         },
       ],
       text: {
@@ -180,7 +215,7 @@ async function analyzeWithOpenAi({
   }
 
   const parsed = JSON.parse(outputText);
-  return normalizeReceipt(parsed);
+  return normalizeReceipt(parsed, rawText);
 }
 
 function extractOutputText(payload: any): string | null {
@@ -197,22 +232,68 @@ function extractOutputText(payload: any): string | null {
   return null;
 }
 
-function normalizeReceipt(value: any) {
-  const category = ["food", "alcohol", "hygiene", "fun", "other"].includes(value.category)
-    ? value.category
-    : "other";
+function normalizeReceipt(value: any, fallbackRawText: string) {
+  const items = normalizeItems(value.items);
+  const category = normalizeCategory(value.category) ?? dominantCategory(items) ?? "other";
+  const itemTotal = items.reduce((sum, item) => sum + item.amount, 0);
+  const totalAmount = typeof value.totalAmount === "number" && value.totalAmount > 0
+    ? Math.round(value.totalAmount * 100) / 100
+    : itemTotal > 0
+    ? Math.round(itemTotal * 100) / 100
+    : null;
 
   return {
     storeName: blankToNull(value.storeName),
-    totalAmount: typeof value.totalAmount === "number" && value.totalAmount > 0
-      ? Math.round(value.totalAmount * 100) / 100
-      : null,
+    totalAmount,
     expenseDate: dateOrNull(value.expenseDate),
     category,
-    description: blankToNull(value.description) ?? blankToNull(value.storeName) ?? "Receipt purchase",
-    rawText: blankToNull(value.rawText),
+    description: blankToNull(value.description) ?? blankToNull(value.storeName) ??
+      (items.length === 1 ? items[0].name : "Receipt purchase"),
+    rawText: blankToNull(value.rawText) ?? blankToNull(fallbackRawText),
     confidence: clampNumber(value.confidence, 0, 1),
+    items,
   };
+}
+
+function normalizeItems(value: unknown) {
+  if (!Array.isArray(value)) return [];
+
+  return value
+    .map((item) => {
+      name: blankToNull(item?.name) ?? "",
+      amount: typeof item?.amount === "number" && item.amount > 0
+        ? Math.round(item.amount * 100) / 100
+        : 0,
+      category: normalizeCategory(item?.category) ?? "other",
+    })
+    .filter((item) => item.name.length > 0 && item.amount > 0)
+    .slice(0, 80);
+}
+
+function normalizeCategory(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  return ["food", "alcohol", "hygiene", "fun", "other"].includes(value) ? value : null;
+}
+
+function dominantCategory(items: Array<{ category: string; amount: number }>): string | null {
+  const totals = new Map<string, number>();
+  for (const item of items) {
+    totals.set(item.category, (totals.get(item.category) ?? 0) + item.amount);
+  }
+
+  let category: string | null = null;
+  let amount = 0;
+  for (const [key, value] of totals.entries()) {
+    if (value > amount) {
+      category = key;
+      amount = value;
+    }
+  }
+  return category;
+}
+
+function clipText(value: string, maxLength: number): string {
+  return value.length <= maxLength ? value : value.slice(0, maxLength);
 }
 
 function blankToNull(value: unknown): string | null {

@@ -142,13 +142,14 @@ class AppRepository {
   }
 
   Future<List<ExpenseItem>> getRecentExpenses() async {
-    _requireUser();
+    final user = _requireUser();
 
     final rows = await _client
         .from('expense_items')
         .select(
           'id, receipt_id, name, amount, category, expense_date, created_at',
         )
+        .eq('user_id', user.id)
         .order('expense_date', ascending: false)
         .order('created_at', ascending: false)
         .limit(12);
@@ -232,11 +233,12 @@ class AppRepository {
   }
 
   Future<List<FixedExpense>> getFixedExpenses() async {
-    _requireUser();
+    final user = _requireUser();
 
     final rows = await _client
         .from('fixed_expenses')
         .select('id, name, amount, billing_day, is_active')
+        .eq('user_id', user.id)
         .order('billing_day')
         .order('name');
 
@@ -246,11 +248,12 @@ class AppRepository {
   }
 
   Future<List<IncomeEvent>> getIncomeEvents() async {
-    _requireUser();
+    final user = _requireUser();
 
     final rows = await _client
         .from('income_events')
         .select('id, name, amount, expected_day, is_recurring')
+        .eq('user_id', user.id)
         .order('expected_day')
         .order('name');
 
@@ -278,6 +281,50 @@ class AppRepository {
     if (receiptId != null) {
       values['receipt_id'] = receiptId;
     }
+
+    await _client.from('expense_items').insert(values);
+  }
+
+  Future<void> addReceiptExpenses({
+    required String receiptId,
+    required DateTime expenseDate,
+    required List<ReceiptExpenseDraft> expenses,
+  }) async {
+    final user = _requireUser();
+    final sanitized = expenses
+        .where(
+          (expense) => expense.name.trim().isNotEmpty && expense.amount > 0,
+        )
+        .toList();
+    if (sanitized.isEmpty) {
+      throw StateError('Add at least one receipt item.');
+    }
+
+    final receipt = await _client
+        .from('receipts')
+        .select('id')
+        .eq('id', receiptId)
+        .eq('user_id', user.id)
+        .maybeSingle();
+    if (receipt == null) {
+      throw StateError('Receipt not found.');
+    }
+
+    final date = DateFormat('yyyy-MM-dd').format(expenseDate);
+    final values = sanitized.map((expense) {
+      final category = expenseCategories.contains(expense.category)
+          ? expense.category
+          : 'other';
+      return {
+        'receipt_id': receiptId,
+        'user_id': user.id,
+        'name': expense.name.trim(),
+        'amount': expense.amount,
+        'category': category,
+        'ai_categorized': true,
+        'expense_date': date,
+      };
+    }).toList();
 
     await _client.from('expense_items').insert(values);
   }
@@ -397,17 +444,30 @@ class AppRepository {
   }
 
   Future<String> createReceiptImageUrl(String imagePath) async {
-    _requireUser();
+    final user = _requireUser();
+    if (!_isOwnReceiptPath(imagePath, user.id)) {
+      throw StateError('Receipt image path does not belong to current user.');
+    }
+
     return _client.storage
         .from(receiptImagesBucket)
         .createSignedUrl(imagePath, 60 * 15);
   }
 
-  Future<ReceiptAnalysis> analyzeReceipt(String receiptId) async {
+  Future<ReceiptAnalysis> analyzeReceipt(
+    String receiptId, {
+    String? rawOcrText,
+  }) async {
     _requireUser();
+    final body = <String, Object?>{'receiptId': receiptId};
+    final trimmedText = rawOcrText?.trim();
+    if (trimmedText != null && trimmedText.isNotEmpty) {
+      body['rawText'] = trimmedText;
+    }
+
     final response = await _client.functions.invoke(
       'analyze-receipt',
-      body: {'receiptId': receiptId},
+      body: body,
     );
 
     final map = _responseMap(response.data);
@@ -420,12 +480,30 @@ class AppRepository {
 
   Future<void> deleteExpense(String id) async {
     final user = _requireUser();
+    final existing = await _client
+        .from('expense_items')
+        .select('receipt_id')
+        .eq('id', id)
+        .eq('user_id', user.id)
+        .maybeSingle();
+    final receiptId = existing?['receipt_id'] as String?;
 
     await _client
         .from('expense_items')
         .delete()
         .eq('id', id)
         .eq('user_id', user.id);
+
+    if (receiptId != null) {
+      try {
+        await _deleteReceiptIfUnreferenced(
+          receiptId: receiptId,
+          userId: user.id,
+        );
+      } catch (_) {
+        // Expense deletion should not fail because optional receipt cleanup failed.
+      }
+    }
   }
 
   Future<void> addFixedExpense({
@@ -445,9 +523,13 @@ class AppRepository {
   }
 
   Future<void> deleteFixedExpense(String id) async {
-    _requireUser();
+    final user = _requireUser();
 
-    await _client.from('fixed_expenses').delete().eq('id', id);
+    await _client
+        .from('fixed_expenses')
+        .delete()
+        .eq('id', id)
+        .eq('user_id', user.id);
   }
 
   Future<void> addIncomeEvent({
@@ -468,9 +550,42 @@ class AppRepository {
   }
 
   Future<void> deleteIncomeEvent(String id) async {
-    _requireUser();
+    final user = _requireUser();
 
-    await _client.from('income_events').delete().eq('id', id);
+    await _client
+        .from('income_events')
+        .delete()
+        .eq('id', id)
+        .eq('user_id', user.id);
+  }
+
+  Future<void> _deleteReceiptIfUnreferenced({
+    required String receiptId,
+    required String userId,
+  }) async {
+    final remaining = await _client
+        .from('expense_items')
+        .select('id')
+        .eq('receipt_id', receiptId)
+        .eq('user_id', userId)
+        .limit(1);
+    if (remaining.isNotEmpty) {
+      return;
+    }
+
+    final row = await _client
+        .from('receipts')
+        .select(_receiptSelectColumns)
+        .eq('id', receiptId)
+        .eq('user_id', userId)
+        .maybeSingle();
+    if (row == null) {
+      return;
+    }
+
+    await deleteReceiptUpload(
+      ReceiptUpload.fromMap(Map<String, dynamic>.from(row)),
+    );
   }
 
   User _requireUser() {
@@ -619,6 +734,7 @@ class ReceiptAnalysis {
     this.category,
     this.description,
     this.confidence,
+    this.items = const [],
   });
 
   final String? storeName;
@@ -627,11 +743,24 @@ class ReceiptAnalysis {
   final String? category;
   final String? description;
   final double? confidence;
+  final List<ReceiptAnalysisItem> items;
 
   factory ReceiptAnalysis.fromMap(Map<String, dynamic> map) {
     final amount = map['totalAmount'] ?? map['total_amount'];
     final rawDate = map['expenseDate'] ?? map['expense_date'];
-    final rawCategory = map['category'] as String?;
+    final rawCategory = map['category']?.toString();
+    final rawItems = map['items'];
+    final items = rawItems is List
+        ? rawItems
+              .whereType<Map>()
+              .map((item) {
+                return ReceiptAnalysisItem.fromMap(
+                  Map<String, dynamic>.from(item),
+                );
+              })
+              .where((item) => item.name.isNotEmpty && item.amount > 0)
+              .toList()
+        : <ReceiptAnalysisItem>[];
 
     return ReceiptAnalysis(
       storeName: _blankToNull(map['storeName'] ?? map['store_name']),
@@ -642,15 +771,52 @@ class ReceiptAnalysis {
       confidence: map['confidence'] == null
           ? null
           : _toDouble(map['confidence']).clamp(0.0, 1.0).toDouble(),
+      items: items,
     );
   }
 
   bool get hasUsefulSuggestion =>
+      items.isNotEmpty ||
       (description != null && description!.isNotEmpty) ||
       (storeName != null && storeName!.isNotEmpty) ||
       (totalAmount != null && totalAmount! > 0) ||
       expenseDate != null ||
       category != null;
+}
+
+class ReceiptAnalysisItem {
+  const ReceiptAnalysisItem({
+    required this.name,
+    required this.amount,
+    required this.category,
+  });
+
+  final String name;
+  final double amount;
+  final String category;
+
+  factory ReceiptAnalysisItem.fromMap(Map<String, dynamic> map) {
+    final rawCategory = map['category']?.toString();
+    return ReceiptAnalysisItem(
+      name: _blankToNull(map['name']) ?? '',
+      amount: _toDouble(map['amount']),
+      category: expenseCategories.contains(rawCategory)
+          ? rawCategory!
+          : 'other',
+    );
+  }
+}
+
+class ReceiptExpenseDraft {
+  const ReceiptExpenseDraft({
+    required this.name,
+    required this.amount,
+    required this.category,
+  });
+
+  final String name;
+  final double amount;
+  final String category;
 }
 
 class CategorySpending {
@@ -764,25 +930,68 @@ String? _blankToNull(Object? value) {
 }
 
 String _receiptExtension(String originalName, String? mimeType) {
-  final lowerName = originalName.toLowerCase();
-  if (lowerName.endsWith('.png') || mimeType == 'image/png') {
+  final normalizedMimeType = _normalizeReceiptMimeType(mimeType);
+  if (normalizedMimeType == 'image/png') {
     return '.png';
   }
-  if (lowerName.endsWith('.webp') || mimeType == 'image/webp') {
+  if (normalizedMimeType == 'image/webp') {
     return '.webp';
+  }
+  if (normalizedMimeType == 'image/jpeg') {
+    return '.jpg';
+  }
+
+  final lowerName = originalName.toLowerCase();
+  if (lowerName.endsWith('.png')) {
+    return '.png';
+  }
+  if (lowerName.endsWith('.webp')) {
+    return '.webp';
+  }
+  if (lowerName.endsWith('.jpg') || lowerName.endsWith('.jpeg')) {
+    return '.jpg';
+  }
+  if (lowerName.endsWith('.heic') || lowerName.endsWith('.heif')) {
+    throw StateError(
+      'Unsupported receipt image format. Use JPG, PNG, or WebP.',
+    );
   }
   return '.jpg';
 }
 
 String _receiptContentType(String extension, String? mimeType) {
-  if (mimeType != null && mimeType.startsWith('image/')) {
-    return mimeType;
+  final normalizedMimeType = _normalizeReceiptMimeType(mimeType);
+  if (normalizedMimeType != null) {
+    return normalizedMimeType;
   }
   return switch (extension) {
     '.png' => 'image/png',
     '.webp' => 'image/webp',
     _ => 'image/jpeg',
   };
+}
+
+String? _normalizeReceiptMimeType(String? mimeType) {
+  final value = mimeType?.trim().toLowerCase();
+  if (value == null || value.isEmpty) {
+    return null;
+  }
+  if (value == 'image/jpg') {
+    return 'image/jpeg';
+  }
+  if (value == 'image/jpeg' || value == 'image/png' || value == 'image/webp') {
+    return value;
+  }
+  if (value.startsWith('image/')) {
+    throw StateError(
+      'Unsupported receipt image format. Use JPG, PNG, or WebP.',
+    );
+  }
+  return null;
+}
+
+bool _isOwnReceiptPath(String imagePath, String userId) {
+  return imagePath == userId || imagePath.startsWith('$userId/');
 }
 
 class _BudgetPeriod {

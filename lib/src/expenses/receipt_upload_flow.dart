@@ -33,9 +33,18 @@ Future<void> showReceiptUploadFlow({
 
   ReceiptUpload? receipt;
   ReceiptAnalysis? analysis;
+  String? rawOcrText;
+  Object? ocrError;
   Object? analysisError;
   try {
     final bytes = await image.readAsBytes();
+
+    try {
+      rawOcrText = await _extractReceiptText(image.path);
+    } catch (error) {
+      ocrError = error;
+    }
+
     receipt = await ref
         .read(appRepositoryProvider)
         .createReceiptUpload(
@@ -47,7 +56,7 @@ Future<void> showReceiptUploadFlow({
     try {
       analysis = await ref
           .read(appRepositoryProvider)
-          .analyzeReceipt(receipt.id);
+          .analyzeReceipt(receipt.id, rawOcrText: rawOcrText);
     } catch (error) {
       analysisError = error;
     }
@@ -63,6 +72,14 @@ Future<void> showReceiptUploadFlow({
       messenger.showSnackBar(
         SnackBar(content: Text(_receiptAnalysisFallbackMessage(analysisError))),
       );
+    } else if (ocrError != null && rawOcrText == null) {
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Local OCR was unavailable, so receipt analysis used the uploaded image.',
+          ),
+        ),
+      );
     }
 
     final saved = await showModalBottomSheet<bool>(
@@ -70,12 +87,22 @@ Future<void> showReceiptUploadFlow({
       isScrollControlled: true,
       useSafeArea: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => AddExpenseSheet(
-        receipt: receipt,
-        receiptAnalysis: analysis?.hasUsefulSuggestion == true
+      builder: (context) {
+        final usefulAnalysis = analysis?.hasUsefulSuggestion == true
             ? analysis
-            : null,
-      ),
+            : null;
+        if (usefulAnalysis?.items.isNotEmpty == true) {
+          return ReceiptReviewSheet(
+            receipt: receipt!,
+            analysis: usefulAnalysis!,
+          );
+        }
+
+        return AddExpenseSheet(
+          receipt: receipt,
+          receiptAnalysis: usefulAnalysis,
+        );
+      },
     );
 
     if (saved == true) {
@@ -101,6 +128,23 @@ Future<void> showReceiptUploadFlow({
     if (context.mounted) {
       messenger.showSnackBar(SnackBar(content: Text(error.toString())));
     }
+  }
+}
+
+Future<String?> _extractReceiptText(String imagePath) async {
+  if (imagePath.trim().isEmpty) {
+    return null;
+  }
+
+  final recognizer = TextRecognizer(script: TextRecognitionScript.latin);
+  try {
+    final recognized = await recognizer.processImage(
+      InputImage.fromFilePath(imagePath),
+    );
+    final text = recognized.text.trim();
+    return text.isEmpty ? null : text;
+  } finally {
+    await recognizer.close();
   }
 }
 
@@ -183,7 +227,7 @@ class _ReceiptSourceSheet extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            'Upload an image now. OCR and automatic categorization come next.',
+            'Runs local OCR first, then uses AI to turn receipt text into expense suggestions.',
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
               color: Theme.of(context).colorScheme.onSurfaceVariant,
             ),

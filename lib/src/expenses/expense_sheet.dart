@@ -278,6 +278,10 @@ class _ReceiptAnalysisSummary extends StatelessWidget {
   Widget build(BuildContext context) {
     final details = [
       if (analysis.storeName != null) analysis.storeName!,
+      if (analysis.items.isNotEmpty)
+        analysis.items.length == 1
+            ? '1 line item'
+            : '${analysis.items.length} line items',
       if (analysis.category != null) _categoryLabel(analysis.category!),
       if (analysis.expenseDate != null)
         DateFormat.yMMMd().format(analysis.expenseDate!),

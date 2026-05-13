@@ -413,12 +413,11 @@ class _RecipeCard extends StatelessWidget {
         children: [
           Text(recipe.name, style: Theme.of(context).textTheme.titleLarge),
           const SizedBox(height: 6),
-          Row(
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
             children: [
-              if (cost != null) ...[
-                SoftPill(label: formatter.format(cost)),
-                const SizedBox(width: 8),
-              ],
+              if (cost != null) SoftPill(label: formatter.format(cost)),
               if (calories != null) SoftPill(label: '$calories kcal'),
             ],
           ),

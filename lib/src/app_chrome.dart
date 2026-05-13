@@ -138,11 +138,18 @@ class Kicker extends StatelessWidget {
 }
 
 class SoftPill extends StatelessWidget {
-  const SoftPill({required this.label, this.icon, this.color, super.key});
+  const SoftPill({
+    required this.label,
+    this.icon,
+    this.color,
+    this.overflow,
+    super.key,
+  });
 
   final String label;
   final IconData? icon;
   final Color? color;
+  final TextOverflow? overflow;
 
   @override
   Widget build(BuildContext context) {
@@ -164,6 +171,7 @@ class SoftPill extends StatelessWidget {
           ],
           Text(
             label,
+            overflow: overflow,
             style: Theme.of(context).textTheme.labelSmall?.copyWith(
               color: Theme.of(context).colorScheme.onSurface,
               letterSpacing: 0.45,

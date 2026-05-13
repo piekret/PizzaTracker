@@ -154,20 +154,22 @@ class _StatsSummaryCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            alignment: WrapAlignment.spaceBetween,
             children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Kicker('Monthly pulse'),
-                    const SizedBox(height: 6),
-                    Text(
-                      monthLabel,
-                      style: Theme.of(context).textTheme.titleLarge,
-                    ),
-                  ],
-                ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Kicker('Monthly pulse'),
+                  const SizedBox(height: 6),
+                  Text(
+                    monthLabel,
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                ],
               ),
               SoftPill(label: formatter.format(spent)),
             ],
@@ -241,20 +243,22 @@ class _StatsHeroCard extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            alignment: WrapAlignment.spaceBetween,
             children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Kicker('Budget story'),
-                    const SizedBox(height: 6),
-                    Text(
-                      'This month in one glance',
-                      style: Theme.of(context).textTheme.titleLarge,
-                    ),
-                  ],
-                ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Kicker('Budget story'),
+                  const SizedBox(height: 6),
+                  Text(
+                    'This month in one glance',
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                ],
               ),
               SoftPill(
                 label: level.shortLabel,

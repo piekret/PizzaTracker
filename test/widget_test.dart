@@ -219,6 +219,9 @@ void main() {
   });
 
   testWidgets('shows receipt line item review from analysis', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(320, 760));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
     await tester.pumpWidget(
       ProviderScope(
         overrides: [

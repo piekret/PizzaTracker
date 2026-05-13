@@ -312,42 +312,56 @@ class _ReceiptItemEditor extends StatelessWidget {
             },
           ),
           const SizedBox(height: 10),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: TextFormField(
-                  controller: item.amount,
-                  decoration: const InputDecoration(
-                    labelText: 'Amount',
-                    prefixIcon: Icon(Icons.payments_outlined),
-                  ),
-                  keyboardType: const TextInputType.numberWithOptions(
-                    decimal: true,
-                  ),
-                  textInputAction: TextInputAction.next,
-                  onChanged: (_) => onAmountChanged(),
-                  validator: _validatePositiveAmount,
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final useStackedFields = constraints.maxWidth < 360;
+              final amountField = TextFormField(
+                controller: item.amount,
+                decoration: const InputDecoration(
+                  labelText: 'Amount',
+                  prefixIcon: Icon(Icons.payments_outlined),
                 ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: DropdownButtonFormField<String>(
-                  initialValue: item.category,
-                  decoration: const InputDecoration(
-                    labelText: 'Category',
-                    prefixIcon: Icon(Icons.category_outlined),
-                  ),
-                  items: expenseCategories.map((category) {
-                    return DropdownMenuItem(
-                      value: category,
-                      child: Text(_categoryLabel(category)),
-                    );
-                  }).toList(),
-                  onChanged: (value) => onCategoryChanged(value ?? 'other'),
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
                 ),
-              ),
-            ],
+                textInputAction: TextInputAction.next,
+                onChanged: (_) => onAmountChanged(),
+                validator: _validatePositiveAmount,
+              );
+              final categoryField = DropdownButtonFormField<String>(
+                initialValue: item.category,
+                decoration: const InputDecoration(
+                  labelText: 'Category',
+                  prefixIcon: Icon(Icons.category_outlined),
+                ),
+                items: expenseCategories.map((category) {
+                  return DropdownMenuItem(
+                    value: category,
+                    child: Text(_categoryLabel(category)),
+                  );
+                }).toList(),
+                onChanged: (value) => onCategoryChanged(value ?? 'other'),
+              );
+
+              if (useStackedFields) {
+                return Column(
+                  children: [
+                    amountField,
+                    const SizedBox(height: 10),
+                    categoryField,
+                  ],
+                );
+              }
+
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(child: amountField),
+                  const SizedBox(width: 10),
+                  Expanded(child: categoryField),
+                ],
+              );
+            },
           ),
         ],
       ),

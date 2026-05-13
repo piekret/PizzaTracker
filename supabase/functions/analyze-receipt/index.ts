@@ -7,43 +7,45 @@ const corsHeaders = {
 };
 
 const receiptSchema = {
-  type: "object",
-  additionalProperties: false,
+  type: "OBJECT",
   properties: {
-    storeName: { type: ["string", "null"] },
-    totalAmount: { type: ["number", "null"] },
+    storeName: { type: "STRING", nullable: true },
+    totalAmount: { type: "NUMBER", nullable: true },
     expenseDate: {
-      type: ["string", "null"],
+      type: "STRING",
+      nullable: true,
       description: "Receipt date in YYYY-MM-DD format when visible.",
     },
     category: {
-      type: ["string", "null"],
-      enum: ["food", "alcohol", "hygiene", "fun", "other", null],
+      type: "STRING",
+      nullable: true,
+      enum: ["food", "alcohol", "hygiene", "fun", "other"],
     },
     description: {
-      type: ["string", "null"],
+      type: "STRING",
+      nullable: true,
       description: "Short expense name suitable for the app form.",
     },
     rawText: {
-      type: ["string", "null"],
+      type: "STRING",
+      nullable: true,
       description: "Visible receipt text, compacted when possible.",
     },
     confidence: {
-      type: "number",
+      type: "NUMBER",
       minimum: 0,
       maximum: 1,
     },
     items: {
-      type: "array",
+      type: "ARRAY",
       description: "Visible receipt line items that should become expense rows.",
       items: {
-        type: "object",
-        additionalProperties: false,
+        type: "OBJECT",
         properties: {
-          name: { type: "string" },
-          amount: { type: "number" },
+          name: { type: "STRING" },
+          amount: { type: "NUMBER" },
           category: {
-            type: "string",
+            type: "STRING",
             enum: ["food", "alcohol", "hygiene", "fun", "other"],
           },
         },
@@ -73,11 +75,11 @@ serve(async (req) => {
       return json({ error: "Method not allowed" }, 405);
     }
 
-    const openAiKey = Deno.env.get("OPENAI_API_KEY");
+    const geminiKey = Deno.env.get("GEMINI_API_KEY");
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 
-    if (!openAiKey || !supabaseUrl || !serviceRoleKey) {
+    if (!geminiKey || !supabaseUrl || !serviceRoleKey) {
       return json({ error: "Function environment is not configured" }, 500);
     }
 
@@ -126,8 +128,8 @@ serve(async (req) => {
       imageUrl = signed.signedUrl;
     }
 
-    const extracted = await analyzeWithOpenAi({
-      apiKey: openAiKey,
+    const extracted = await analyzeWithGemini({
+      apiKey: geminiKey,
       rawText: localOcrText,
       imageUrl,
     });
@@ -149,7 +151,7 @@ serve(async (req) => {
   }
 });
 
-async function analyzeWithOpenAi({
+async function analyzeWithGemini({
   apiKey,
   rawText,
   imageUrl,
@@ -158,78 +160,99 @@ async function analyzeWithOpenAi({
   rawText: string;
   imageUrl: string | null;
 }) {
-  const model = Deno.env.get("OPENAI_RECEIPT_MODEL") ??
-    Deno.env.get("OPENAI_MODEL") ??
-    "gpt-4.1-mini";
-  const userContent: Array<Record<string, unknown>> = [
+  const model = Deno.env.get("GEMINI_RECEIPT_MODEL") ??
+    Deno.env.get("GEMINI_MODEL") ??
+    "gemini-1.5-flash";
+  const parts: Array<Record<string, unknown>> = [
     {
-      type: "input_text",
       text: rawText
         ? `Categorize this locally extracted receipt OCR text. Prefer real purchasable line items; ignore receipt metadata, payment lines, loyalty messages, taxes, and change due unless they are the only usable amount.\n\nReceipt OCR text:\n${clipText(rawText, 14000)}`
         : "Extract this receipt into line items and app-ready expense fields.",
     },
   ];
   if (imageUrl) {
-    userContent.push({ type: "input_image", image_url: imageUrl });
+    parts.push(await imagePartFromUrl(imageUrl));
   }
 
-  const response = await fetch("https://api.openai.com/v1/responses", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model,
-      input: [
-        {
-          role: "system",
-          content:
-            "You extract receipt details for a student budgeting app. Return only fields allowed by the schema. Use the visible grand total, not subtotal. For items, return purchasable line items with prices and categories from food, alcohol, hygiene, fun, other. If line items are unclear, return an empty items array and still provide the best single expense fields.",
-        },
-        {
-          role: "user",
-          content: userContent,
-        },
-      ],
-      text: {
-        format: {
-          type: "json_schema",
-          name: "receipt_analysis",
-          schema: receiptSchema,
-          strict: true,
-        },
+  const response = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
       },
-    }),
-  });
+      body: JSON.stringify({
+        systemInstruction: {
+          parts: [
+            {
+              text:
+                "You extract receipt details for a student budgeting app. Return only fields allowed by the schema. Use the visible grand total, not subtotal. For items, return purchasable line items with prices and categories from food, alcohol, hygiene, fun, other. If line items are unclear, return an empty items array and still provide the best single expense fields.",
+            },
+          ],
+        },
+        contents: [
+          {
+            role: "user",
+            parts,
+          },
+        ],
+        generationConfig: {
+          temperature: 0.2,
+          responseMimeType: "application/json",
+          responseSchema: receiptSchema,
+        },
+      }),
+    },
+  );
 
   if (!response.ok) {
     const body = await response.text();
-    throw new Error(`OpenAI receipt analysis failed: ${body}`);
+    throw new Error(`Gemini receipt analysis failed: ${body}`);
   }
 
   const payload = await response.json();
-  const outputText = payload.output_text ?? extractOutputText(payload);
+  const outputText = extractGeminiText(payload);
   if (!outputText) {
-    throw new Error("OpenAI response did not contain text output");
+    throw new Error("Gemini response did not contain text output");
   }
 
   const parsed = JSON.parse(outputText);
   return normalizeReceipt(parsed, rawText);
 }
 
-function extractOutputText(payload: any): string | null {
-  const output = payload.output;
-  if (!Array.isArray(output)) return null;
-
-  for (const item of output) {
-    const content = item?.content;
-    if (!Array.isArray(content)) continue;
-    for (const part of content) {
-      if (typeof part?.text === "string") return part.text;
-    }
+function extractGeminiText(payload: any): string | null {
+  const candidate = payload?.candidates?.[0];
+  const parts = candidate?.content?.parts;
+  if (!Array.isArray(parts)) return null;
+  for (const part of parts) {
+    if (typeof part?.text === "string") return part.text;
   }
   return null;
+}
+
+async function imagePartFromUrl(url: string) {
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error("Failed to download receipt image for Gemini");
+  }
+  const mimeType = response.headers.get("content-type") ?? "image/jpeg";
+  const buffer = new Uint8Array(await response.arrayBuffer());
+
+  return {
+    inlineData: {
+      mimeType,
+      data: bufferToBase64(buffer),
+    },
+  };
+}
+
+function bufferToBase64(buffer: Uint8Array): string {
+  const chunkSize = 0x8000;
+  let binary = "";
+  for (let i = 0; i < buffer.length; i += chunkSize) {
+    binary += String.fromCharCode(...buffer.subarray(i, i + chunkSize));
+  }
+  return btoa(binary);
 }
 
 function normalizeReceipt(value: any, fallbackRawText: string) {
@@ -260,11 +283,13 @@ function normalizeItems(value: unknown) {
 
   return value
     .map((item) => {
-      name: blankToNull(item?.name) ?? "",
-      amount: typeof item?.amount === "number" && item.amount > 0
-        ? Math.round(item.amount * 100) / 100
-        : 0,
-      category: normalizeCategory(item?.category) ?? "other",
+      return {
+        name: blankToNull(item?.name) ?? "",
+        amount: typeof item?.amount === "number" && item.amount > 0
+          ? Math.round(item.amount * 100) / 100
+          : 0,
+        category: normalizeCategory(item?.category) ?? "other",
+      };
     })
     .filter((item) => item.name.length > 0 && item.amount > 0)
     .slice(0, 80);

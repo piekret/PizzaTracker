@@ -3,6 +3,7 @@
 Flutter student budget tracker with Supabase auth/database integration.
 
 Receipts are read with local ML Kit OCR first, then categorized through a Supabase Edge Function so OpenAI keys never ship with the app.
+Recipe suggestions are generated through a separate Supabase Edge Function using the OpenAI API.
 
 ## Local Setup
 
@@ -29,6 +30,13 @@ flutter run
 ```
 
 Keep `OPENAI_API_KEY`, service-role keys, Firebase admin credentials, and database passwords in `.env` only. Do not put them in `.env.client` or `assets/env/client.env`; the generated asset file is bundled into the Flutter app.
+
+For recipe generation, set the following secrets on Supabase:
+
+```bash
+supabase secrets set GEMINI_API_KEY=...
+supabase secrets set GEMINI_RECIPE_MODEL=gemini-2.5-flash
+```
 
 You can still run with explicit dart defines if needed:
 
@@ -58,3 +66,10 @@ supabase db push
 ```
 
 The migration creates the app tables, RLS policies, receipt image bucket policies, dashboard views, and the `get_budget_snapshot` RPC. `docs/supabase-ai-prompt.md` remains a reference for the intended schema.
+
+## Edge Functions
+
+```bash
+supabase functions deploy analyze-receipt
+supabase functions deploy generate-recipes
+```

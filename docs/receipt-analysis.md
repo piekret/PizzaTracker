@@ -22,8 +22,8 @@ Receipt images are currently kept in private Supabase Storage so users can reope
 Set these for the Supabase function:
 
 ```bash
-supabase secrets set OPENAI_API_KEY=...
-supabase secrets set OPENAI_RECEIPT_MODEL=gpt-4.1-mini
+supabase secrets set GEMINI_API_KEY=...
+supabase secrets set GEMINI_RECEIPT_MODEL=gemini-2.5-flash
 ```
 
 `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are provided by Supabase in Edge Functions.

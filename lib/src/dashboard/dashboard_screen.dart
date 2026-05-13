@@ -102,6 +102,10 @@ class DashboardScreen extends ConsumerWidget {
                       const _LoadingCard(label: 'Loading recent expenses...'),
                   error: (error, stackTrace) => _ErrorCard(error: error),
                 ),
+                const SizedBox(height: 14),
+                _StatsTeaserCard(currency: currency),
+                const SizedBox(height: 12),
+                _RecipesTeaserCard(currency: currency),
               ],
             ),
           ),
@@ -148,6 +152,126 @@ class DashboardScreen extends ConsumerWidget {
     ref.invalidate(recentExpensesProvider);
     ref.invalidate(expenseHistoryProvider);
     ref.invalidate(categorySpendingProvider);
+  }
+}
+
+class _StatsTeaserCard extends StatelessWidget {
+  const _StatsTeaserCard({required this.currency});
+
+  final String currency;
+
+  @override
+  Widget build(BuildContext context) {
+    return FrostPanel(
+      padding: const EdgeInsets.all(20),
+      onTap: () => Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (context) => StatsScreen(currency: currency),
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              gradient: context.palette.accentGradient,
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: const Icon(Icons.bar_chart_rounded, color: Colors.white),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Financial stupidity charts',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'See the category split and daily damage for this month.',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 10),
+          Icon(
+            Icons.chevron_right_rounded,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _RecipesTeaserCard extends ConsumerWidget {
+  const _RecipesTeaserCard({required this.currency});
+
+  final String currency;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final snapshot = ref.watch(budgetSnapshotProvider).asData?.value;
+    final index = snapshot?.desperationIndex ?? 0;
+    final isLocked = index < 60;
+
+    return FrostPanel(
+      padding: const EdgeInsets.all(20),
+      onTap: () => Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (context) => RecipesScreen(currency: currency),
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              color: context.palette.secondaryGlow.withValues(alpha: 0.16),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: context.palette.border),
+            ),
+            child: Icon(
+              Icons.restaurant_menu_outlined,
+              color: context.palette.secondaryGlow,
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'What to cook',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  isLocked
+                      ? 'Unlocks at desperation 60+. For now, hydrate.'
+                      : 'Use what you have. AI will keep you alive.',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 10),
+          Icon(
+            Icons.chevron_right_rounded,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
+        ],
+      ),
+    );
   }
 }
 

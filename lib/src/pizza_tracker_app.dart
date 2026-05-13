@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:fl_chart/fl_chart.dart';
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
@@ -17,6 +18,8 @@ part 'dashboard/dashboard_screen.dart';
 part 'dashboard/desperation_card.dart';
 part 'dashboard/edit_budget_sheet.dart';
 part 'dashboard/planning_cards.dart';
+part 'dashboard/stats_screen.dart';
+part 'recipes/recipes_screen.dart';
 part 'expenses/expense_history_screen.dart';
 part 'expenses/expense_sheet.dart';
 part 'expenses/recent_expenses_card.dart';

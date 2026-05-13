@@ -29,6 +29,10 @@ final expenseHistoryProvider = FutureProvider<List<ExpenseItem>>((ref) async {
   return ref.watch(appRepositoryProvider).getExpenseHistory();
 });
 
+final monthlySummaryProvider = FutureProvider<MonthlySummary?>((ref) async {
+  return ref.watch(appRepositoryProvider).getMonthlySummary();
+});
+
 final receiptUploadProvider = FutureProvider.family<ReceiptUpload, String>((
   ref,
   receiptId,
@@ -56,6 +60,14 @@ final fixedExpensesProvider = FutureProvider<List<FixedExpense>>((ref) async {
 
 final incomeEventsProvider = FutureProvider<List<IncomeEvent>>((ref) async {
   return ref.watch(appRepositoryProvider).getIncomeEvents();
+});
+
+final recipeGeneratorProvider = FutureProvider.family<
+    List<RecipeSuggestion>, RecipeRequest>((ref, request) async {
+  return ref.watch(appRepositoryProvider).generateRecipes(
+        ingredients: request.ingredients,
+        desperationIndex: request.desperationIndex,
+      );
 });
 
 const expenseCategories = ['food', 'alcohol', 'hygiene', 'fun', 'other'];
@@ -174,6 +186,26 @@ class AppRepository {
     return rows
         .map((row) => ExpenseItem.fromMap(Map<String, dynamic>.from(row)))
         .toList();
+  }
+
+  Future<MonthlySummary?> getMonthlySummary() async {
+    final user = _requireUser();
+
+    final data = await _client
+        .from('v_monthly_summary')
+        .select(
+          'month, total_spent, food_spent, alcohol_spent, hygiene_spent, fun_spent, other_spent, receipt_count',
+        )
+        .eq('user_id', user.id)
+        .order('month', ascending: false)
+        .limit(1)
+        .maybeSingle();
+
+    if (data == null) {
+      return null;
+    }
+
+    return MonthlySummary.fromMap(Map<String, dynamic>.from(data));
   }
 
   Future<List<CategorySpending>> getCategorySpending({
@@ -559,6 +591,38 @@ class AppRepository {
         .eq('user_id', user.id);
   }
 
+  Future<List<RecipeSuggestion>> generateRecipes({
+    required List<String> ingredients,
+    required int desperationIndex,
+  }) async {
+    _requireUser();
+    final response = await _client.functions.invoke(
+      'generate-recipes',
+      body: {
+        'ingredients': ingredients,
+        'desperationIndex': desperationIndex,
+      },
+    );
+
+    final map = _responseMap(response.data);
+    final error = map['error'];
+    if (error != null) {
+      throw StateError(error.toString());
+    }
+    final rawRecipes = map['recipes'];
+    if (rawRecipes is! List) {
+      throw StateError('Recipe response missing recipes array.');
+    }
+
+    return rawRecipes
+        .whereType<Map>()
+        .map((recipe) => RecipeSuggestion.fromMap(
+              Map<String, dynamic>.from(recipe),
+            ))
+        .where((recipe) => recipe.name.isNotEmpty)
+        .toList();
+  }
+
   Future<void> _deleteReceiptIfUnreferenced({
     required String receiptId,
     required String userId,
@@ -883,6 +947,95 @@ class IncomeEvent {
   }
 }
 
+class MonthlySummary {
+  const MonthlySummary({
+    required this.month,
+    required this.totalSpent,
+    required this.receiptCount,
+    required this.amountByCategory,
+  });
+
+  final DateTime month;
+  final double totalSpent;
+  final int receiptCount;
+  final Map<String, double> amountByCategory;
+
+  factory MonthlySummary.fromMap(Map<String, dynamic> map) {
+    return MonthlySummary(
+      month: DateTime.parse(map['month'].toString()),
+      totalSpent: _toDouble(map['total_spent']),
+      receiptCount: _toInt(map['receipt_count']),
+      amountByCategory: {
+        'food': _toDouble(map['food_spent']),
+        'alcohol': _toDouble(map['alcohol_spent']),
+        'hygiene': _toDouble(map['hygiene_spent']),
+        'fun': _toDouble(map['fun_spent']),
+        'other': _toDouble(map['other_spent']),
+      },
+    );
+  }
+}
+
+class RecipeRequest {
+  const RecipeRequest({
+    required this.ingredients,
+    required this.desperationIndex,
+  });
+
+  final List<String> ingredients;
+  final int desperationIndex;
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    return other is RecipeRequest &&
+        other.desperationIndex == desperationIndex &&
+        _listEquals(other.ingredients, ingredients);
+  }
+
+  @override
+  int get hashCode =>
+      Object.hash(desperationIndex, Object.hashAll(ingredients));
+}
+
+class RecipeSuggestion {
+  const RecipeSuggestion({
+    required this.name,
+    required this.ingredientsUsed,
+    required this.steps,
+    required this.estimatedCost,
+    required this.calories,
+    required this.note,
+  });
+
+  final String name;
+  final List<String> ingredientsUsed;
+  final List<String> steps;
+  final double? estimatedCost;
+  final int? calories;
+  final String? note;
+
+  factory RecipeSuggestion.fromMap(Map<String, dynamic> map) {
+    final rawIngredients = map['ingredients_used'];
+    final rawSteps = map['steps'];
+
+    return RecipeSuggestion(
+      name: (map['name'] as String?)?.trim() ?? '',
+      ingredientsUsed: rawIngredients is List
+          ? rawIngredients.map((item) => item.toString()).toList()
+          : const [],
+      steps: rawSteps is List
+          ? rawSteps.map((item) => item.toString()).toList()
+          : const [],
+      estimatedCost: map['estimated_cost'] == null
+          ? null
+          : _toDouble(map['estimated_cost']),
+      calories: map['calories'] == null ? null : _toInt(map['calories']),
+      note: (map['note'] as String?)?.trim(),
+    );
+  }
+}
+
 double _toDouble(Object? value) {
   if (value == null) {
     return 0;
@@ -992,6 +1145,18 @@ String? _normalizeReceiptMimeType(String? mimeType) {
 
 bool _isOwnReceiptPath(String imagePath, String userId) {
   return imagePath == userId || imagePath.startsWith('$userId/');
+}
+
+bool _listEquals(List<String> left, List<String> right) {
+  if (left.length != right.length) {
+    return false;
+  }
+  for (var i = 0; i < left.length; i++) {
+    if (left[i] != right[i]) {
+      return false;
+    }
+  }
+  return true;
 }
 
 class _BudgetPeriod {

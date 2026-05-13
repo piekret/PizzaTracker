@@ -29,6 +29,8 @@ class _AddExpenseSheetState extends ConsumerState<AddExpenseSheet> {
   bool get _isEditing => widget.expense != null;
   String? get _attachedReceiptId =>
       widget.receipt?.id ?? widget.expense?.receiptId;
+  bool get _hasReceiptAutofill =>
+      widget.receiptAnalysis?.hasUsefulSuggestion == true && !_isEditing;
 
   @override
   void initState() {
@@ -145,10 +147,14 @@ class _AddExpenseSheetState extends ConsumerState<AddExpenseSheet> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Kicker('Manual entry'),
+            Kicker(_hasReceiptAutofill ? 'Receipt autofill' : 'Manual entry'),
             const SizedBox(height: 8),
             Text(
-              _isEditing ? 'Edit expense' : 'Add expense',
+              _isEditing
+                  ? 'Edit expense'
+                  : _hasReceiptAutofill
+                  ? 'Review extracted expense'
+                  : 'Add expense',
               style: Theme.of(context).textTheme.headlineMedium,
             ),
             const SizedBox(height: 16),

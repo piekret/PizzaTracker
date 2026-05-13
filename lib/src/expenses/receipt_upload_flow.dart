@@ -60,6 +60,9 @@ Future<void> showReceiptUploadFlow({
     } catch (error) {
       analysisError = error;
     }
+    if (analysis?.hasUsefulSuggestion != true) {
+      analysis = _fallbackAnalysisFromOcr(rawOcrText) ?? analysis;
+    }
 
     if (context.mounted) {
       Navigator.of(context, rootNavigator: true).pop();
@@ -100,7 +103,7 @@ Future<void> showReceiptUploadFlow({
 
         return AddExpenseSheet(
           receipt: receipt,
-          receiptAnalysis: usefulAnalysis,
+          receiptAnalysis: analysis,
         );
       },
     );
@@ -148,6 +151,88 @@ Future<String?> _extractReceiptText(String imagePath) async {
   }
 }
 
+ReceiptAnalysis? _fallbackAnalysisFromOcr(String? rawText) {
+  final text = rawText?.trim();
+  if (text == null || text.isEmpty) {
+    return null;
+  }
+
+  final lines = text
+      .split(RegExp(r'\r?\n'))
+      .map((line) => line.trim())
+      .where((line) => line.length >= 2)
+      .toList();
+  if (lines.isEmpty) {
+    return null;
+  }
+
+  final storeName = _guessReceiptStore(lines);
+  final totalAmount = _guessReceiptTotal(lines);
+  if (storeName == null && totalAmount == null) {
+    return null;
+  }
+
+  return ReceiptAnalysis(
+    storeName: storeName,
+    totalAmount: totalAmount,
+    description: storeName == null ? 'Receipt purchase' : '$storeName purchase',
+    category: 'other',
+    confidence: 0.35,
+  );
+}
+
+String? _guessReceiptStore(List<String> lines) {
+  for (final line in lines.take(8)) {
+    final normalized = line.toLowerCase();
+    final hasLetter = RegExp(r'[a-zA-ZąćęłńóśźżĄĆĘŁŃÓŚŹŻ]').hasMatch(line);
+    final looksLikeMetadata =
+        normalized.contains('nip') ||
+        normalized.contains('paragon') ||
+        normalized.contains('receipt') ||
+        normalized.contains('kasa') ||
+        normalized.contains('terminal') ||
+        normalized.contains('www.') ||
+        normalized.contains('@');
+    if (hasLetter && !looksLikeMetadata) {
+      return line.length > 40 ? line.substring(0, 40).trim() : line;
+    }
+  }
+  return null;
+}
+
+double? _guessReceiptTotal(List<String> lines) {
+  double? fallback;
+  for (final line in lines) {
+    final amounts = _extractMoneyValues(line);
+    if (amounts.isEmpty) {
+      continue;
+    }
+    fallback = amounts.last;
+    final normalized = line.toLowerCase();
+    final looksLikeTotal =
+        normalized.contains('total') ||
+        normalized.contains('suma') ||
+        normalized.contains('razem') ||
+        normalized.contains('zapłaty') ||
+        normalized.contains('zaplata') ||
+        normalized.contains('należność') ||
+        normalized.contains('naleznosc');
+    if (looksLikeTotal) {
+      return amounts.last;
+    }
+  }
+  return fallback;
+}
+
+List<double> _extractMoneyValues(String line) {
+  final matches = RegExp(r'(?<!\d)(\d{1,5})[,.](\d{2})(?!\d)').allMatches(line);
+  return matches
+      .map((match) => double.tryParse('${match.group(1)}.${match.group(2)}'))
+      .whereType<double>()
+      .where((value) => value > 0)
+      .toList();
+}
+
 Future<XFile?> _pickReceiptImage({
   required ImagePicker picker,
   required ImageSource source,
@@ -175,6 +260,14 @@ String _receiptPickerError(Object error) {
 
 String _receiptAnalysisFallbackMessage(Object error) {
   final message = error.toString();
+  final normalized = message.toLowerCase();
+  if (normalized.contains('quota') ||
+      normalized.contains('rate limit') ||
+      normalized.contains('rate_limit') ||
+      normalized.contains('resource_exhausted') ||
+      normalized.contains('429')) {
+    return 'Gemini quota is exhausted. Using local OCR only; check the fields before saving.';
+  }
   if (message.contains('Function not found') ||
       message.contains('not configured') ||
       message.contains('analyze-receipt')) {

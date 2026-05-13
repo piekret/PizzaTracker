@@ -58,11 +58,16 @@ class _ExpenseHistoryScreenState extends ConsumerState<ExpenseHistoryScreen> {
           child: Column(
             children: [
               _ExpenseHistoryHeader(onBack: () => Navigator.of(context).pop()),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 10),
-                child: _HistoryFilters(
-                  searchController: _searchController,
-                  category: _category,
+                Padding(
+                  padding: EdgeInsets.fromLTRB(
+                    _responsiveGutter(context),
+                    12,
+                    _responsiveGutter(context),
+                    10,
+                  ),
+                  child: _HistoryFilters(
+                    searchController: _searchController,
+                    category: _category,
                   onSearchChanged: () => setState(() {}),
                   onCategoryChanged: (value) {
                     setState(() => _category = value);
@@ -82,7 +87,12 @@ class _ExpenseHistoryScreenState extends ConsumerState<ExpenseHistoryScreen> {
                       onRefresh: _refresh,
                       child: ListView(
                         physics: const AlwaysScrollableScrollPhysics(),
-                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 150),
+                        padding: EdgeInsets.fromLTRB(
+                          _responsiveGutter(context),
+                          0,
+                          _responsiveGutter(context),
+                          150,
+                        ),
                         children: [
                           _HistorySummary(
                             count: filtered.length,
@@ -357,20 +367,37 @@ class _HistorySummary extends StatelessWidget {
 
     return FrostPanel(
       padding: const EdgeInsets.all(16),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final isNarrow = constraints.maxWidth < 420;
+          final pill = SoftPill(label: total);
+          final content = Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Kicker('Filtered total'),
+              const SizedBox(height: 6),
+              Text(label, style: Theme.of(context).textTheme.titleMedium),
+            ],
+          );
+
+          if (isNarrow) {
+            return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Kicker('Filtered total'),
-                const SizedBox(height: 6),
-                Text(label, style: Theme.of(context).textTheme.titleMedium),
+                content,
+                const SizedBox(height: 8),
+                pill,
               ],
-            ),
-          ),
-          SoftPill(label: total),
-        ],
+            );
+          }
+
+          return Row(
+            children: [
+              Expanded(child: content),
+              pill,
+            ],
+          );
+        },
       ),
     );
   }

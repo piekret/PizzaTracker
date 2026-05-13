@@ -16,6 +16,14 @@ String? _validateMonthDay(String? value) {
   return null;
 }
 
+double _responsiveGutter(BuildContext context, {double maxWidth = 860}) {
+  final width = MediaQuery.sizeOf(context).width;
+  if (width <= maxWidth) {
+    return 16;
+  }
+  return ((width - maxWidth) / 2).clamp(16, 220).toDouble();
+}
+
 ({Color color, String label, String shortLabel, IconData icon}) _levelForIndex(
   int index,
 ) {

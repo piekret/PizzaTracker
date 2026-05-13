@@ -13,6 +13,15 @@ class _RecipesScreenState extends ConsumerState<RecipesScreen> {
   final _ingredientController = TextEditingController();
   final _ingredients = <String>[];
   RecipeRequest? _lastRequest;
+  final _suggested = const [
+    'pasta',
+    'eggs',
+    'onion',
+    'rice',
+    'beans',
+    'cheese',
+    'tomato',
+  ];
 
   @override
   void dispose() {
@@ -38,7 +47,12 @@ class _RecipesScreenState extends ConsumerState<RecipesScreen> {
               _RecipesHeader(onBack: () => Navigator.of(context).pop()),
               Expanded(
                 child: ListView(
-                  padding: const EdgeInsets.fromLTRB(16, 6, 16, 120),
+                  padding: EdgeInsets.fromLTRB(
+                    _responsiveGutter(context),
+                    6,
+                    _responsiveGutter(context),
+                    120,
+                  ),
                   children: [
                     _RecipeIntroCard(
                       desperationIndex: index,
@@ -50,6 +64,8 @@ class _RecipesScreenState extends ConsumerState<RecipesScreen> {
                       ingredients: _ingredients,
                       isLocked: isLocked,
                       onAdd: _addIngredient,
+                      suggestions: _suggested,
+                      onAddSuggestion: _addSuggested,
                       onRemove: _removeIngredient,
                     ),
                     const SizedBox(height: 14),
@@ -87,6 +103,13 @@ class _RecipesScreenState extends ConsumerState<RecipesScreen> {
 
   void _removeIngredient(String value) {
     setState(() => _ingredients.remove(value));
+  }
+
+  void _addSuggested(String value) {
+    if (_ingredients.contains(value)) {
+      return;
+    }
+    setState(() => _ingredients.add(value));
   }
 
   void _generateRecipes(int desperationIndex) {
@@ -149,6 +172,7 @@ class _RecipeIntroCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final level = _levelForIndex(desperationIndex);
     return FrostPanel(
       padding: const EdgeInsets.all(20),
       child: Column(
@@ -170,11 +194,9 @@ class _RecipeIntroCard extends StatelessWidget {
                 ),
               ),
               SoftPill(
-                label: isLocked ? 'Locked' : 'Unlocked',
-                icon: isLocked ? Icons.lock_outline : Icons.lock_open_outlined,
-                color: isLocked
-                    ? Theme.of(context).colorScheme.error
-                    : context.palette.primaryGlow,
+                label: isLocked ? 'Locked' : level.shortLabel,
+                icon: isLocked ? Icons.lock_outline : level.icon,
+                color: isLocked ? Theme.of(context).colorScheme.error : level.color,
               ),
             ],
           ),
@@ -199,6 +221,8 @@ class _IngredientInputCard extends StatelessWidget {
     required this.ingredients,
     required this.isLocked,
     required this.onAdd,
+    required this.suggestions,
+    required this.onAddSuggestion,
     required this.onRemove,
   });
 
@@ -206,6 +230,8 @@ class _IngredientInputCard extends StatelessWidget {
   final List<String> ingredients;
   final bool isLocked;
   final VoidCallback onAdd;
+  final List<String> suggestions;
+  final ValueChanged<String> onAddSuggestion;
   final ValueChanged<String> onRemove;
 
   @override
@@ -244,11 +270,29 @@ class _IngredientInputCard extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           if (ingredients.isEmpty)
-            Text(
-              'Add at least 2 ingredients for better results.',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Add at least 2 ingredients for better results.',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: suggestions
+                      .map(
+                        (item) => InputChip(
+                          label: Text(item),
+                          onPressed: isLocked ? null : () => onAddSuggestion(item),
+                        ),
+                      )
+                      .toList(),
+                ),
+              ],
             )
           else
             Wrap(
@@ -288,8 +332,8 @@ class _GenerateButton extends StatelessWidget {
       onPressed: canGenerate ? onPressed : null,
       icon: const Icon(Icons.auto_awesome_outlined),
       label: Text(
-        ingredients.isEmpty
-            ? 'Add ingredients to generate'
+        ingredients.length < 2
+            ? 'Add at least 2 ingredients'
             : 'Generate recipes',
       ),
     );
@@ -360,6 +404,7 @@ class _RecipeCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final cost = recipe.estimatedCost;
     final calories = recipe.calories;
+    final hasIngredients = recipe.ingredientsUsed.isNotEmpty;
 
     return FrostPanel(
       padding: const EdgeInsets.all(18),
@@ -377,6 +422,16 @@ class _RecipeCard extends StatelessWidget {
               if (calories != null) SoftPill(label: '$calories kcal'),
             ],
           ),
+          if (hasIngredients) ...[
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: recipe.ingredientsUsed
+                  .map((item) => Chip(label: Text(item)))
+                  .toList(),
+            ),
+          ],
           if (recipe.note != null && recipe.note!.isNotEmpty) ...[
             const SizedBox(height: 10),
             Text(
@@ -386,20 +441,6 @@ class _RecipeCard extends StatelessWidget {
               ),
             ),
           ],
-          const SizedBox(height: 12),
-          Text(
-            'Ingredients used',
-            style: Theme.of(context).textTheme.labelLarge,
-          ),
-          const SizedBox(height: 6),
-          Text(
-            recipe.ingredientsUsed.isEmpty
-                ? 'Use whatever is listed in your pantry.'
-                : recipe.ingredientsUsed.join(', '),
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-            ),
-          ),
           const SizedBox(height: 12),
           Text(
             'Steps',

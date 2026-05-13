@@ -70,6 +70,20 @@ final recipeGeneratorProvider = FutureProvider.family<
       );
 });
 
+final insightsProvider = FutureProvider.family<
+    InsightsResponse, InsightsRequest>((ref, request) async {
+  return ref.watch(appRepositoryProvider).generateInsights(
+        month: request.month,
+      );
+});
+
+final insightsRefreshProvider = FutureProvider.family<
+    InsightsResponse, InsightsRequest>((ref, request) async {
+  return ref.watch(appRepositoryProvider).refreshInsights(
+        month: request.month,
+      );
+});
+
 const expenseCategories = ['food', 'alcohol', 'hygiene', 'fun', 'other'];
 const receiptImagesBucket = 'receipt-images';
 const _receiptSelectColumns =
@@ -623,6 +637,43 @@ class AppRepository {
         .toList();
   }
 
+  Future<InsightsResponse> generateInsights({required String month}) async {
+    _requireUser();
+    final response = await _client.functions.invoke(
+      'generate-insights',
+      body: {
+        'month': month,
+      },
+    );
+
+    final map = _responseMap(response.data);
+    final error = map['error'];
+    if (error != null) {
+      throw StateError(error.toString());
+    }
+
+    return InsightsResponse.fromMap(map);
+  }
+
+  Future<InsightsResponse> refreshInsights({required String month}) async {
+    _requireUser();
+    final response = await _client.functions.invoke(
+      'generate-insights',
+      body: {
+        'month': month,
+        'force': true,
+      },
+    );
+
+    final map = _responseMap(response.data);
+    final error = map['error'];
+    if (error != null) {
+      throw StateError(error.toString());
+    }
+
+    return InsightsResponse.fromMap(map);
+  }
+
   Future<void> _deleteReceiptIfUnreferenced({
     required String receiptId,
     required String userId,
@@ -1032,6 +1083,121 @@ class RecipeSuggestion {
           : _toDouble(map['estimated_cost']),
       calories: map['calories'] == null ? null : _toInt(map['calories']),
       note: (map['note'] as String?)?.trim(),
+    );
+  }
+}
+
+class InsightsRequest {
+  const InsightsRequest({required this.month});
+
+  final String month;
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    return other is InsightsRequest && other.month == month;
+  }
+
+  @override
+  int get hashCode => month.hashCode;
+}
+
+class InsightsResponse {
+  const InsightsResponse({
+    required this.month,
+    required this.cached,
+    required this.insights,
+  });
+
+  final String month;
+  final bool cached;
+  final MonthlyInsights insights;
+
+  factory InsightsResponse.fromMap(Map<String, dynamic> map) {
+    return InsightsResponse(
+      month: map['month']?.toString() ?? '',
+      cached: map['cached'] == true,
+      insights: MonthlyInsights.fromMap(
+        Map<String, dynamic>.from(map['insights'] as Map),
+      ),
+    );
+  }
+}
+
+class MonthlyInsights {
+  const MonthlyInsights({
+    required this.summary,
+    required this.absurdPurchases,
+    required this.categoryCallouts,
+  });
+
+  final String summary;
+  final List<AbsurdPurchase> absurdPurchases;
+  final List<CategoryCallout> categoryCallouts;
+
+  factory MonthlyInsights.fromMap(Map<String, dynamic> map) {
+    return MonthlyInsights(
+      summary: map['summary']?.toString() ?? '',
+      absurdPurchases: (map['absurd_purchases'] as List?)
+              ?.whereType<Map>()
+              .map((item) => AbsurdPurchase.fromMap(
+                    Map<String, dynamic>.from(item),
+                  ))
+              .toList() ??
+          const [],
+      categoryCallouts: (map['category_callouts'] as List?)
+              ?.whereType<Map>()
+              .map((item) => CategoryCallout.fromMap(
+                    Map<String, dynamic>.from(item),
+                  ))
+              .toList() ??
+          const [],
+    );
+  }
+}
+
+class AbsurdPurchase {
+  const AbsurdPurchase({
+    required this.name,
+    required this.amount,
+    required this.category,
+    required this.date,
+    required this.note,
+  });
+
+  final String name;
+  final double amount;
+  final String category;
+  final DateTime date;
+  final String? note;
+
+  factory AbsurdPurchase.fromMap(Map<String, dynamic> map) {
+    return AbsurdPurchase(
+      name: map['name']?.toString() ?? '',
+      amount: _toDouble(map['amount']),
+      category: map['category']?.toString() ?? 'other',
+      date: DateTime.tryParse(map['date']?.toString() ?? '') ?? DateTime.now(),
+      note: map['note']?.toString(),
+    );
+  }
+}
+
+class CategoryCallout {
+  const CategoryCallout({
+    required this.category,
+    required this.amount,
+    required this.note,
+  });
+
+  final String category;
+  final double amount;
+  final String note;
+
+  factory CategoryCallout.fromMap(Map<String, dynamic> map) {
+    return CategoryCallout(
+      category: map['category']?.toString() ?? 'other',
+      amount: _toDouble(map['amount']),
+      note: map['note']?.toString() ?? '',
     );
   }
 }

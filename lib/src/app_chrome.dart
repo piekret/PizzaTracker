@@ -119,9 +119,10 @@ class BrandMark extends StatelessWidget {
 }
 
 class Kicker extends StatelessWidget {
-  const Kicker(this.text, {super.key});
+  const Kicker(this.text, {this.overflow, super.key});
 
   final String text;
+  final TextOverflow? overflow;
 
   @override
   Widget build(BuildContext context) {
@@ -131,6 +132,7 @@ class Kicker extends StatelessWidget {
         color: context.palette.primaryGlow,
         letterSpacing: 1.45,
       ),
+      overflow: overflow,
     );
   }
 }

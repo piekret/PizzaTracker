@@ -181,7 +181,7 @@ class _AuthBrandPanel extends StatelessWidget {
               const SizedBox(width: 14),
               Expanded(
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.start, // Fixed analyzer issue
                   children: [
                     Text(
                       'PizzaTracker',
@@ -321,7 +321,7 @@ class _AuthFormPanel extends StatelessWidget {
         key: formKey,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
-          mainAxisSize: MainAxisSize.min,
+        mainAxisSize: MainAxisSize.min, // Fixed analyzer issue
           children: [
             const Kicker('Private beta'),
             const SizedBox(height: 10),

@@ -86,6 +86,9 @@ class _AddExpenseSheetState extends ConsumerState<AddExpenseSheet> {
           expenseDate: _expenseDate,
           receiptId: widget.receipt?.id,
         );
+        if (mounted) {
+          _showSavedToast();
+        }
       } else {
         await repository.updateExpense(
           id: expense.id,
@@ -95,6 +98,9 @@ class _AddExpenseSheetState extends ConsumerState<AddExpenseSheet> {
           expenseDate: _expenseDate,
           receiptId: widget.receipt?.id,
         );
+        if (mounted) {
+          _showSavedToast(isEdit: true);
+        }
       }
       if (mounted) {
         Navigator.of(context).pop(true);
@@ -106,6 +112,28 @@ class _AddExpenseSheetState extends ConsumerState<AddExpenseSheet> {
         setState(() => _isSaving = false);
       }
     }
+  }
+
+  void _showSavedToast({bool isEdit = false}) {
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            Icon(
+              isEdit ? Icons.check_circle_outline : Icons.check_rounded,
+              color: Colors.white,
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(isEdit ? 'Expense updated.' : 'Expense saved.'),
+            ),
+          ],
+        ),
+        behavior: SnackBarBehavior.floating,
+        margin: const EdgeInsets.all(16),
+      ),
+    );
   }
 
   @override
@@ -131,6 +159,7 @@ class _AddExpenseSheetState extends ConsumerState<AddExpenseSheet> {
                 prefixIcon: Icon(Icons.shopping_bag_outlined),
               ),
               textInputAction: TextInputAction.next,
+              textCapitalization: TextCapitalization.sentences,
               validator: (value) {
                 if (value == null || value.trim().isEmpty) {
                   return 'Name is required.';
@@ -148,6 +177,7 @@ class _AddExpenseSheetState extends ConsumerState<AddExpenseSheet> {
               keyboardType: const TextInputType.numberWithOptions(
                 decimal: true,
               ),
+              textInputAction: TextInputAction.next,
               validator: (value) {
                 final amount = double.tryParse(
                   (value ?? '').replaceAll(',', '.'),

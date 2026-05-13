@@ -25,7 +25,7 @@
 
 The central UX element is the **Desperation Index** — a number from 0 to 100 calculated in real time based on the remaining budget, days left until the end of the month, and the user's spending history. The higher the index, the more the app switches into "crisis mode" and starts serving recipes with 4 ingredients.
 
-The project is built as a mobile application (Android + iOS) using **Flutter**, with a backend powered by **Supabase** and integrations with **Google ML Kit** and the **OpenAI API**.
+The project is built as a mobile application (Android + iOS) using **Flutter**, with a backend powered by **Supabase** and integrations with **Google ML Kit** and the **Gemini API**.
 
 ---
 
@@ -37,7 +37,7 @@ The user takes a photo of any store receipt (supermarket, fast food, convenience
 
 - Processes the image **locally** using Google ML Kit Text Recognition (offline, zero API cost)
 - Extracts line items, prices, and the total amount
-- Sends the extracted text to the **OpenAI API**, which categorizes each item (`food`, `alcohol`, `hygiene`, `fun`, `other`)
+- Sends the extracted text to the **Gemini API**, which categorizes each item (`food`, `alcohol`, `hygiene`, `fun`, `other`)
 - Shows the user a list of items with the option to manually correct categories before saving
 - Persists the expense to **Supabase Postgres**
 
@@ -63,7 +63,7 @@ The index updates automatically after every recorded expense and at midnight eac
 
 ### 2.3 AI Fridge Recipes 🤖
 
-In "End of Month" mode (Desperation Index > 60) a **What to Cook** section unlocks. The user types in or selects from a list whatever they have in the fridge/cupboards — the OpenAI API generates:
+In "End of Month" mode (Desperation Index > 60) a **What to Cook** section unlocks. The user types in or selects from a list whatever they have in the fridge/cupboards — the Gemini API generates:
 
 - 3 meal suggestions using exactly those ingredients
 - Estimated cost per meal
@@ -128,7 +128,7 @@ The app operates exclusively on **disposable budget** (after fixed costs), so th
         │                              └─────────┬─────────┘
         ▼                                        │
 ┌───────────────┐                                ▼
-│   OpenAI      │◄───────────────── Edge Function (proxy)
+│   Gemini      │◄───────────────── Edge Function (proxy)
 │  API          │   (categorization,
 │               │    recipes, analysis)
 └───────────────┘
@@ -143,7 +143,7 @@ The app operates exclusively on **disposable budget** (after fixed costs), so th
 
 **Key architectural decisions:**
 
-- The OpenAI API is called **exclusively through a Supabase Edge Function** (Deno) — the API key never reaches the mobile client
+- The Gemini API is called **exclusively through a Supabase Edge Function** (Deno) — the API key never reaches the mobile client
 - OCR runs **offline on-device** via ML Kit — no cost per scan
 - Supabase Row Level Security (RLS) ensures users only ever see their own data
 - App state is managed with **Riverpod** (or BLoC — interchangeable)
@@ -172,7 +172,7 @@ The app operates exclusively on **disposable budget** (after fixed costs), so th
 |-----------|---------|
 | Supabase (Postgres) | Primary database — expenses, categories, budgets |
 | Supabase Auth | Authentication (email/password + Google OAuth) |
-| Supabase Edge Functions (Deno) | OpenAI API proxy, server-side logic, cron jobs |
+| Supabase Edge Functions (Deno) | Gemini API proxy, server-side logic, cron jobs |
 | Supabase Realtime | Cross-device sync (optional) |
 | Firebase Cloud Messaging | Push notifications |
 
@@ -181,7 +181,7 @@ The app operates exclusively on **disposable budget** (after fixed costs), so th
 | API | Purpose | Cost Model |
 |-----|---------|------------|
 | Google ML Kit Text Recognition | Receipt OCR | **Free** (on-device) |
-| OpenAI API (GPT model) | Categorization, recipes, analysis | Pay-per-token |
+| Gemini API (Gemini model) | Categorization, recipes, analysis | Pay-per-token |
 | Firebase Cloud Messaging | Push notifications | **Free** up to quota |
 
 ---
@@ -297,7 +297,7 @@ Supabase Edge Function: POST /categorize-receipt
   payload: { raw_text: "..." }
         │
         ▼
-Edge Function → OpenAI API
+Edge Function → Gemini API
   prompt: "Extract line items from this receipt and assign categories..."
   response: JSON with items + categories + store name
         │
@@ -328,7 +328,7 @@ Supabase Edge Function: POST /generate-recipes
   payload: { ingredients: [...], desperation_index: 78 }
         │
         ▼
-Edge Function → OpenAI API
+Edge Function → Gemini API
   system: "You are a student chef with 10 years of dorm-room experience..."
   user: "I have: pasta, eggs, soy sauce, onion. Desperation Index: 78/100."
         │
@@ -366,36 +366,39 @@ Future<String> extractTextFromImage(String imagePath) async {
 - ML Kit runs fully offline, is free, and is accurate enough for printed receipts
 - No receipt image is ever transmitted to an external server (privacy win)
 
-### Supabase Edge Function — OpenAI API Proxy
+### Supabase Edge Function — Gemini API Proxy
 
 ```typescript
 // supabase/functions/categorize-receipt/index.ts
-import OpenAI from "npm:openai";
-
-const openai = new OpenAI({ apiKey: Deno.env.get("OPENAI_API_KEY") });
-
 Deno.serve(async (req) => {
   const { raw_text } = await req.json();
+  const apiKey = Deno.env.get("GEMINI_API_KEY");
+  const model = Deno.env.get("GEMINI_MODEL") ?? "gemini-2.5-flash";
 
-  const completion = await openai.chat.completions.create({
-    model: Deno.env.get("OPENAI_MODEL") ?? "gpt-4.1-mini",
-    response_format: { type: "json_object" },
-    messages: [
-      {
-        role: "user",
-        content: `Analyze this receipt text and return a JSON object with fields:
+  const response = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [{
+          role: "user",
+          parts: [{ text: `Analyze this receipt text and return a JSON object with fields:
           - store_name (string)
           - items: array of { name, amount (float), category }
           Categories: food, alcohol, hygiene, fun, other.
           Reply with ONLY valid JSON, no surrounding text.
           
           Receipt text:
-          ${raw_text}`,
-      },
-    ],
-  });
+          ${raw_text}` }],
+        }],
+        generationConfig: { responseMimeType: "application/json" },
+      }),
+    },
+  );
 
-  const content = completion.choices[0].message.content ?? "{}";
+  const data = await response.json();
+  const content = data.candidates?.[0]?.content?.parts?.[0]?.text ?? "{}";
   const parsed = JSON.parse(content);
 
   return new Response(JSON.stringify(parsed), {
@@ -550,7 +553,7 @@ for (const user of users) {
 
 ### Performance
 - On-device OCR: < 2 seconds for a standard A5 receipt
-- OpenAI API response (categorization): < 4 seconds
+- Gemini API response (categorization): < 4 seconds
 - Dashboard load (cached): < 500ms
 - Dashboard load (cold start, from network): < 2 seconds
 
@@ -560,7 +563,7 @@ for (const user of users) {
 - AI categorization requires internet — the app notifies the user and allows manual category assignment as a fallback
 
 ### Security
-- OpenAI API key stored exclusively in Supabase Edge Function environment variables — never shipped in the app binary
+- Gemini API key stored exclusively in Supabase Edge Function environment variables — never shipped in the app binary
 - Supabase RLS — users cannot access other users' data under any circumstances
 - FCM tokens refreshed on every app launch
 - Financial data never leaves Supabase (receipt images are optional and stored only in Supabase Storage)
@@ -572,4 +575,4 @@ for (const user of users) {
 
 ---
 
-*Course project — Mobile Applications | Flutter + Supabase + OpenAI API*
+*Course project — Mobile Applications | Flutter + Supabase + Gemini API*

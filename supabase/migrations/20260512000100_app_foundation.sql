@@ -220,8 +220,8 @@ select
   coalesce(sum(ei.amount) filter (where ei.category = 'hygiene'), 0)::numeric(10,2) as hygiene_spent,
   coalesce(sum(ei.amount) filter (where ei.category = 'fun'), 0)::numeric(10,2) as fun_spent,
   coalesce(sum(ei.amount) filter (where ei.category = 'other'), 0)::numeric(10,2) as other_spent,
-  count(distinct ei.receipt_id) as receipt_count,
-  count(*) as item_count
+  count(distinct ei.receipt_id)::integer as receipt_count,
+  count(*)::integer as item_count
 from public.expense_items ei
 group by ei.user_id, date_trunc('month', ei.expense_date)::date;
 
@@ -232,7 +232,7 @@ select
   ei.user_id,
   ei.expense_date,
   coalesce(sum(ei.amount), 0)::numeric(10,2) as total_spent,
-  count(*) as item_count
+  count(*)::integer as item_count
 from public.expense_items ei
 group by ei.user_id, ei.expense_date;
 
@@ -244,7 +244,7 @@ select
   date_trunc('month', ei.expense_date)::date as month,
   ei.category,
   coalesce(sum(ei.amount), 0)::numeric(10,2) as total_spent,
-  count(*) as item_count
+  count(*)::integer as item_count
 from public.expense_items ei
 group by ei.user_id, date_trunc('month', ei.expense_date)::date, ei.category;
 

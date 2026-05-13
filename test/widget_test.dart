@@ -124,6 +124,13 @@ void main() {
 
     expect(find.text('Add receipt'), findsOneWidget);
     expect(find.text('DESPERATION INDEX'), findsOneWidget);
+
+    await tester.scrollUntilVisible(
+      find.text('Monthly budget locked in'),
+      500,
+      scrollable: find.byType(Scrollable),
+    );
+
     expect(find.text('Monthly budget locked in'), findsOneWidget);
     expect(find.text('Fixed monthly costs'), findsOneWidget);
 

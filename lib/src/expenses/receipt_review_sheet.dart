@@ -77,6 +77,7 @@ class _ReceiptReviewSheetState extends ConsumerState<ReceiptReviewSheet> {
           );
 
       if (mounted) {
+        _showSavedToast();
         Navigator.of(context).pop(true);
       }
     } catch (error) {
@@ -88,6 +89,25 @@ class _ReceiptReviewSheetState extends ConsumerState<ReceiptReviewSheet> {
     }
   }
 
+  void _showSavedToast() {
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            const Icon(Icons.check_rounded, color: Colors.white),
+            const SizedBox(width: 10),
+            const Expanded(
+              child: Text('Receipt saved. Desperation Index updated.'),
+            ),
+          ],
+        ),
+        behavior: SnackBarBehavior.floating,
+        margin: const EdgeInsets.all(16),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final currency =
@@ -95,6 +115,9 @@ class _ReceiptReviewSheetState extends ConsumerState<ReceiptReviewSheet> {
     final formatter = NumberFormat.simpleCurrency(name: currency);
     final confidence = widget.analysis.confidence;
     final receiptTotal = widget.analysis.totalAmount;
+    final difference = receiptTotal == null ? null : (receiptTotal - _total).abs();
+    final showMismatch = receiptTotal != null && difference != null &&
+        difference >= (receiptTotal * 0.02).clamp(0.5, double.infinity);
 
     return AppSheetFrame(
       child: Form(
@@ -151,6 +174,13 @@ class _ReceiptReviewSheetState extends ConsumerState<ReceiptReviewSheet> {
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: Theme.of(context).colorScheme.onSurfaceVariant,
                 ),
+              ),
+            ],
+            if (showMismatch) ...[
+              const SizedBox(height: 8),
+              _InlineError(
+                message:
+                    'Line items total ${formatter.format(_total)}. Receipt total ${formatter.format(receiptTotal)}.',
               ),
             ],
             const SizedBox(height: 14),
@@ -273,6 +303,7 @@ class _ReceiptItemEditor extends StatelessWidget {
               prefixIcon: Icon(Icons.shopping_bag_outlined),
             ),
             textInputAction: TextInputAction.next,
+            textCapitalization: TextCapitalization.sentences,
             validator: (value) {
               if (value == null || value.trim().isEmpty) {
                 return 'Name is required.';
@@ -294,6 +325,7 @@ class _ReceiptItemEditor extends StatelessWidget {
                   keyboardType: const TextInputType.numberWithOptions(
                     decimal: true,
                   ),
+                  textInputAction: TextInputAction.next,
                   onChanged: (_) => onAmountChanged(),
                   validator: _validatePositiveAmount,
                 ),

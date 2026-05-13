@@ -93,9 +93,7 @@ class _DesperationCard extends StatelessWidget {
                     child: LinearProgressIndicator(
                       value: progress,
                       minHeight: 10,
-                      backgroundColor: context.palette.border.withValues(
-                        alpha: 0.42,
-                      ),
+                      backgroundColor: context.palette.border.withValues(alpha: 0.42),
                       valueColor: AlwaysStoppedAnimation(level.color),
                     ),
                   ),

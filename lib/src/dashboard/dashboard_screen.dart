@@ -43,11 +43,25 @@ class DashboardScreen extends ConsumerWidget {
           child: RefreshIndicator(
             onRefresh: () => _refresh(ref),
             child: ListView(
-              padding: const EdgeInsets.fromLTRB(16, 14, 16, 150),
+              padding: EdgeInsets.fromLTRB(
+                _responsiveGutter(context),
+                14,
+                _responsiveGutter(context),
+                150,
+              ),
               children: [
                 _DashboardHeader(
                   onSignOut: () =>
                       ref.read(supabaseClientProvider).auth.signOut(),
+                ),
+                const SizedBox(height: 18),
+                _DashboardHeroCard(
+                  onScanReceipt: () => showReceiptUploadFlow(
+                    context: context,
+                    ref: ref,
+                    onExpenseSaved: () => _invalidateExpenseData(ref),
+                  ),
+                  onAddExpense: () => _showAddExpense(context, ref),
                 ),
                 const SizedBox(height: 18),
                 budget.when(
@@ -312,6 +326,94 @@ class _DashboardHeader extends StatelessWidget {
           onPressed: onSignOut,
         ),
       ],
+    );
+  }
+}
+
+class _DashboardHeroCard extends ConsumerWidget {
+  const _DashboardHeroCard({
+    required this.onScanReceipt,
+    required this.onAddExpense,
+  });
+
+  final VoidCallback onScanReceipt;
+  final VoidCallback onAddExpense;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final snapshot = ref.watch(budgetSnapshotProvider).asData?.value;
+    final currency = ref.watch(userProfileProvider).asData?.value.currency ?? 'USD';
+    final formatter = NumberFormat.simpleCurrency(name: currency);
+    final dailyLimit = snapshot?.dailyLimit;
+    final daysLeft = snapshot?.daysLeft;
+
+    return FrostPanel(
+      padding: const EdgeInsets.all(22),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const BrandMark(size: 46),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Kicker('Can I afford this?'),
+                    const SizedBox(height: 6),
+                    Text(
+                      'Track the money before it disappears.',
+                      style: Theme.of(context).textTheme.titleLarge,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              if (dailyLimit != null)
+                SoftPill(
+                  label: 'Today: ${formatter.format(dailyLimit)}',
+                  icon: Icons.local_pizza_outlined,
+                ),
+              if (daysLeft != null)
+                SoftPill(
+                  label: '$daysLeft days left',
+                  icon: Icons.calendar_month_outlined,
+                ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'Snap a receipt or log an expense to keep the Desperation Index honest.',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: 16),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: [
+              FilledButton.icon(
+                onPressed: onScanReceipt,
+                icon: const Icon(Icons.document_scanner_outlined),
+                label: const Text('Scan receipt'),
+              ),
+              OutlinedButton.icon(
+                onPressed: onAddExpense,
+                icon: const Icon(Icons.add_rounded),
+                label: const Text('Add expense'),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 }

@@ -155,9 +155,7 @@ class _CategorySpendingRow extends StatelessWidget {
                   child: LinearProgressIndicator(
                     value: share,
                     minHeight: 8,
-                    backgroundColor: context.palette.border.withValues(
-                      alpha: 0.36,
-                    ),
+                    backgroundColor: context.palette.border.withValues(alpha: 0.36),
                     valueColor: AlwaysStoppedAnimation(color),
                   ),
                 ),

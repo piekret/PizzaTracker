@@ -13,29 +13,51 @@ class _RecentExpensesCard extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: Column(
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final isNarrow = constraints.maxWidth < 520;
+              final header = Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Kicker('Latest damage'),
+                  const SizedBox(height: 6),
+                  Text(
+                    'Recent expenses',
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                ],
+              );
+              final actions = Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  TextButton.icon(
+                    onPressed: () => _showExpenseHistory(context),
+                    icon: const Icon(Icons.history_rounded),
+                    label: const Text('View all'),
+                  ),
+                  SoftPill(label: '${expenses.length} shown'),
+                ],
+              );
+
+              if (isNarrow) {
+                return Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Kicker('Latest damage'),
-                    const SizedBox(height: 6),
-                    Text(
-                      'Recent expenses',
-                      style: Theme.of(context).textTheme.titleLarge,
-                    ),
+                    header,
+                    const SizedBox(height: 12),
+                    actions,
                   ],
-                ),
-              ),
-              TextButton.icon(
-                onPressed: () => _showExpenseHistory(context),
-                icon: const Icon(Icons.history_rounded),
-                label: const Text('View all'),
-              ),
-              const SizedBox(width: 8),
-              SoftPill(label: '${expenses.length} shown'),
-            ],
+                );
+              }
+
+              return Row(
+                children: [
+                  Expanded(child: header),
+                  actions,
+                ],
+              );
+            },
           ),
           const SizedBox(height: 16),
           if (expenses.isEmpty)
@@ -229,6 +251,8 @@ class _ExpenseRow extends StatelessWidget {
                 Text(
                   expense.name,
                   style: Theme.of(context).textTheme.titleSmall,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
                 const SizedBox(height: 3),
                 Text(
@@ -236,6 +260,8 @@ class _ExpenseRow extends StatelessWidget {
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ],
             ),

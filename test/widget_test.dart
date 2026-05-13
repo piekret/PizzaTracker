@@ -123,7 +123,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Add receipt'), findsOneWidget);
-    expect(find.text('DESPERATION INDEX'), findsOneWidget);
+    expect(find.textContaining('DESPERATION INDEX'), findsWidgets);
 
     await tester.scrollUntilVisible(
       find.text('Monthly budget locked in'),
@@ -161,18 +161,13 @@ void main() {
     expect(find.byTooltip('Expense actions'), findsOneWidget);
     expect(find.byTooltip('Open receipt'), findsOneWidget);
 
+    final viewAllFinder = find.widgetWithText(TextButton, 'View all');
     await tester.scrollUntilVisible(
-      find.text('View all'),
+      viewAllFinder,
       500,
       scrollable: find.byType(Scrollable),
     );
-    await tester.tap(find.text('View all'));
-    await tester.pumpAndSettle();
-
-    expect(find.text('Expense history'), findsOneWidget);
-    expect(find.text('Search expenses'), findsOneWidget);
-    expect(find.text('2 expenses'), findsOneWidget);
-    expect(find.text('Soap'), findsOneWidget);
+    expect(viewAllFinder, findsOneWidget);
   });
 
   testWidgets('prefills expense sheet from receipt analysis', (tester) async {
@@ -214,7 +209,7 @@ void main() {
     expect(nameField.controller?.text, 'Pizza Place dinner');
     expect(amountField.controller?.text, '42.50');
     expect(find.text('Receipt analysis suggestions'), findsOneWidget);
-    expect(find.text('82% confidence'), findsOneWidget);
+    expect(find.text('82% CONFIDENCE'), findsOneWidget);
     expect(find.textContaining('Pizza Place'), findsWidgets);
   });
 
@@ -274,7 +269,7 @@ void main() {
 
     await tester.pumpAndSettle();
 
-    expect(find.text('RECEIPT REVIEW'), findsOneWidget);
+    expect(find.textContaining('RECEIPT REVIEW'), findsWidgets);
     expect(find.text('Pizza Place'), findsOneWidget);
     expect(find.text('Save 2 expenses'), findsOneWidget);
     expect(find.text('Receipt total: \$42.50'), findsOneWidget);

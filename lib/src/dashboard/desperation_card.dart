@@ -43,10 +43,13 @@ class _DesperationCard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
+                  Wrap(
+                    spacing: 10,
+                    runSpacing: 10,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    alignment: WrapAlignment.spaceBetween,
                     children: [
                       const Kicker('Desperation Index'),
-                      const Spacer(),
                       SoftPill(
                         label: level.shortLabel,
                         icon: level.icon,

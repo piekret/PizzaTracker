@@ -431,20 +431,41 @@ class _RoundIconButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final palette = context.palette;
+    final borderRadius = BorderRadius.circular(4);
+
     return Tooltip(
       message: tooltip,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(18),
-        onTap: onPressed,
-        child: Container(
-          width: 44,
-          height: 44,
+      child: Padding(
+        padding: const EdgeInsets.only(right: 3, bottom: 3),
+        child: DecoratedBox(
           decoration: BoxDecoration(
-            color: context.palette.surface,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: context.palette.border),
+            borderRadius: borderRadius,
+            boxShadow: [
+              BoxShadow(
+                color: palette.border,
+                offset: const Offset(3, 3),
+                blurRadius: 0,
+              ),
+            ],
           ),
-          child: Icon(icon, size: 21),
+          child: Material(
+            color: palette.surface,
+            borderRadius: borderRadius,
+            child: InkWell(
+              borderRadius: borderRadius,
+              onTap: onPressed,
+              child: Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  borderRadius: borderRadius,
+                  border: Border.all(color: palette.border, width: 2),
+                ),
+                child: Icon(icon, size: 20, color: palette.border),
+              ),
+            ),
+          ),
         ),
       ),
     );

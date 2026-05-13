@@ -99,15 +99,16 @@ class _StatsHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(12, 10, 16, 0),
+      padding: const EdgeInsets.fromLTRB(14, 26, 16, 4),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           _RoundIconButton(
             tooltip: 'Back',
             icon: Icons.arrow_back_rounded,
             onPressed: onBack,
           ),
-          const SizedBox(width: 14),
+          const SizedBox(width: 16),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,

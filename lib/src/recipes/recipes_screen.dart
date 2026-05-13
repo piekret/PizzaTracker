@@ -133,8 +133,9 @@ class _RecipesHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(12, 10, 16, 0),
+      padding: const EdgeInsets.fromLTRB(14, 26, 16, 4),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           _RoundIconButton(
             tooltip: 'Back',

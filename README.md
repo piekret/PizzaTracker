@@ -1,17 +1,84 @@
 # PizzaTracker
 
-Flutter student budget tracker with Supabase auth/database integration.
+PizzaTracker is a Flutter budget tracker for students. It tracks day-to-day spending, scans receipts, calculates a live Desperation Index, and generates survival recipes when the budget starts looking grim.
 
-Receipts are read with local ML Kit OCR first, then categorized through a Supabase Edge Function so Gemini secrets never ship with the app.
-Recipe suggestions are generated through a separate Supabase Edge Function using the Gemini API.
+The app uses Supabase for auth, Postgres data, storage, and Edge Functions. Receipt OCR starts locally with Google ML Kit, then Supabase Edge Functions call Gemini so AI keys never ship in the Flutter app.
+
+## Features
+
+- Email/password auth through Supabase.
+- Per-account budget data with Row Level Security and client cache scoped to the signed-in user.
+- Manual expense entry and receipt-based expense entry.
+- Receipt scan flow with camera/gallery image picking, local OCR, Gemini receipt analysis, and editable line-item review.
+- Dashboard with remaining budget, spent amount, daily limit, days left, spending mix, recent expenses, fixed costs, income schedule, and Desperation Index.
+- Stats screen with spending summaries and AI monthly insights.
+- Recipe generator powered by Gemini, unlocked by higher Desperation Index values.
+- Client-side budget snapshot calculation from current user rows, so scanned receipt items update the dashboard immediately when saved for the current budget period.
+
+## Tech Stack
+
+- Flutter / Dart
+- Riverpod for state management
+- Supabase Auth, Postgres, Storage, and Edge Functions
+- Google ML Kit Text Recognition for on-device OCR
+- Gemini API behind Supabase Edge Functions
+- `fl_chart` for charts
+
+## Project Layout
+
+```text
+lib/
+  main.dart
+  src/
+    app_data.dart              # providers, repository, models
+    pizza_tracker_app.dart     # app shell and part imports
+    auth/                      # auth gate and auth form
+    dashboard/                 # dashboard, budget cards, stats
+    expenses/                  # manual expenses, receipt scan/review/history
+    planning/                  # budget/fixed expense/income sheets
+    recipes/                   # recipe generation UI
+supabase/
+  migrations/                  # database schema, RLS, policies, RPCs
+  functions/                   # Deno Edge Functions for AI features
+scripts/                       # local env sync and run helpers
+test/                          # widget and data model tests
+```
+
+## Requirements
+
+- Flutter SDK compatible with Dart `^3.11.5`
+- Supabase CLI for database/function deployment
+- A Supabase project
+- Gemini API key for AI receipt analysis, recipes, and insights
 
 ## Local Setup
 
-Fill `.env` in the project root. For plain Flutter runs, the app reads client-safe Supabase values from generated `assets/env/client.env`.
+1. Install dependencies:
 
-The scripts keep local setup repeatable: Flutter does not load the root `.env` automatically, and the full `.env` can contain server-only secrets. The scripts copy or pass only `SUPABASE_URL` and `SUPABASE_ANON_KEY`, which are safe for the client app when Supabase RLS policies are configured correctly.
+```bash
+flutter pub get
+```
 
-If you changed Supabase values in `.env`, sync the generated client asset once:
+2. Copy the environment example and fill in local values:
+
+```bash
+cp .env.example .env
+```
+
+On Windows PowerShell:
+
+```powershell
+Copy-Item .env.example .env
+```
+
+3. Set at least these client values in `.env`:
+
+```text
+SUPABASE_URL=https://your-project-ref.supabase.co
+SUPABASE_ANON_KEY=your-anon-key
+```
+
+4. Sync the client-safe values into the Flutter asset used by normal `flutter run`:
 
 ```bash
 ./scripts/sync_client_env.sh
@@ -23,24 +90,19 @@ On Windows PowerShell:
 powershell -ExecutionPolicy Bypass -File .\scripts\sync_client_env.ps1
 ```
 
-Then run:
+5. Run the app:
 
 ```bash
 flutter run
 ```
 
-Keep `GEMINI_API_KEY`, service-role keys, Firebase admin credentials, and database passwords in `.env` only. Do not put them in `.env.client` or `assets/env/client.env`; the generated asset file is bundled into the Flutter app.
+The generated `assets/env/client.env` is bundled into the Flutter app. Only put client-safe values there: `SUPABASE_URL` and `SUPABASE_ANON_KEY`.
 
-For AI receipt analysis, recipe generation, and insights, set the following secrets on Supabase:
+Do not put `GEMINI_API_KEY`, service-role keys, database passwords, Firebase admin credentials, or other secrets in `.env.client` or `assets/env/client.env`.
 
-```bash
-supabase secrets set GEMINI_API_KEY=...
-supabase secrets set GEMINI_RECEIPT_MODEL=gemini-2.5-flash
-supabase secrets set GEMINI_RECIPE_MODEL=gemini-2.5-flash
-supabase secrets set GEMINI_INSIGHTS_MODEL=gemini-2.5-flash
-```
+## Alternative Run From `.env`
 
-You can still run with explicit dart defines if needed:
+If you want to pass client values as Dart defines instead of using the generated asset:
 
 ```bash
 ./scripts/flutter_run_from_env.sh
@@ -52,27 +114,92 @@ On Windows PowerShell:
 powershell -ExecutionPolicy Bypass -File .\scripts\flutter_run_from_env.ps1
 ```
 
-## Checks
+## Supabase Setup
 
-```bash
-flutter analyze
-flutter test
-```
-
-## Database
-
-The database schema is tracked in `supabase/migrations`. Apply it with the Supabase CLI from the project root:
+Apply the database schema and policies from the project root:
 
 ```bash
 supabase db push
 ```
 
-The migration creates the app tables, RLS policies, receipt image bucket policies, dashboard views, and the `get_budget_snapshot` RPC. `docs/supabase-ai-prompt.md` remains a reference for the intended schema.
+The migrations create the core app tables, RLS policies, receipt image storage policies, dashboard views, AI insight storage, and supporting RPCs.
 
-## Edge Functions
+Set Edge Function secrets in Supabase:
+
+```bash
+supabase secrets set GEMINI_API_KEY=your-gemini-key
+supabase secrets set GEMINI_RECEIPT_MODEL=gemini-2.5-flash
+supabase secrets set GEMINI_RECIPE_MODEL=gemini-2.5-flash
+supabase secrets set GEMINI_INSIGHTS_MODEL=gemini-2.5-flash
+```
+
+Deploy Edge Functions:
 
 ```bash
 supabase functions deploy analyze-receipt
 supabase functions deploy generate-recipes
 supabase functions deploy generate-insights
 ```
+
+## Checks
+
+Run these before committing app changes:
+
+```bash
+flutter analyze
+flutter test
+```
+
+## Important Data Notes
+
+- All user-owned tables are scoped by `user_id` and protected with Supabase RLS.
+- Riverpod account data is tied to the current Supabase user, so switching accounts invalidates cached account data.
+- Recent Expenses shows the latest expenses regardless of budget period.
+- Remaining budget, Spending Mix, and Desperation Index count expenses inside the current budget period.
+- Receipt line-item review defaults the expense date to today. If you manually choose an older receipt date outside the current budget period, the items will still appear in Recent Expenses but will not affect the current Remaining/Spending Mix/Desperation Index.
+
+## Receipt Flow
+
+1. Pick camera or gallery.
+2. ML Kit extracts local OCR text when possible.
+3. The image is uploaded to Supabase Storage and a receipt row is created.
+4. `analyze-receipt` calls Gemini through a Supabase Edge Function.
+5. If line items are detected, the app opens a review screen where names, amounts, categories, and date can be edited.
+6. Saving inserts one expense row per line item and refreshes dashboard budget/spending providers.
+
+## Common Troubleshooting
+
+If the app shows the setup screen:
+
+- Check that `.env` has `SUPABASE_URL` and `SUPABASE_ANON_KEY`.
+- Run the env sync script again.
+- Fully restart the app instead of hot reload.
+
+If receipt AI fails:
+
+- Confirm the Supabase Edge Functions are deployed.
+- Confirm `GEMINI_API_KEY` is set as a Supabase secret.
+- Check Supabase function logs for the failing function.
+
+If scanned receipt items show in Recent Expenses but not in Remaining or Spending Mix:
+
+- Check the date selected in the receipt review screen.
+- Only expenses inside the active budget period affect those dashboard cards.
+
+If data appears shared between users:
+
+- Fully restart the app and test sign-in again.
+- Confirm the latest client code is running.
+- Confirm Supabase RLS policies from `supabase/migrations` have been applied.
+
+## Git Hygiene
+
+Do not commit local secrets or generated build output. In particular, avoid committing:
+
+- `.env`
+- `assets/env/client.env` if it contains real project values
+- `supabase/.temp/`
+- `build/`
+- `.dart_tool/`
+
+Generated Flutter plugin registrant files may change after running on desktop platforms. Review them before committing and only include them when the plugin/platform change is intentional.

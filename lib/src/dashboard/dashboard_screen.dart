@@ -24,7 +24,7 @@ class DashboardScreen extends ConsumerWidget {
             onPressed: () => showReceiptUploadFlow(
               context: context,
               ref: ref,
-              onExpenseSaved: () => _invalidateExpenseData(ref),
+              onExpenseSaved: () => _refreshExpenseData(ref),
             ),
             icon: const Icon(Icons.document_scanner_outlined),
             label: const Text('Add receipt'),
@@ -59,14 +59,17 @@ class DashboardScreen extends ConsumerWidget {
                   onScanReceipt: () => showReceiptUploadFlow(
                     context: context,
                     ref: ref,
-                    onExpenseSaved: () => _invalidateExpenseData(ref),
+                    onExpenseSaved: () => _refreshExpenseData(ref),
                   ),
                   onAddExpense: () => _showAddExpense(context, ref),
                 ),
                 const SizedBox(height: 18),
                 budget.when(
-                  data: (value) =>
-                      _DesperationCard(snapshot: value, currency: currency),
+                  data: (value) => _DesperationCard(
+                    snapshot: value,
+                    currency: currency,
+                    onRefresh: () => _refreshExpenseData(ref),
+                  ),
                   loading: () =>
                       const _LoadingCard(label: 'Calculating desperation...'),
                   error: (error, stackTrace) => _ErrorCard(
@@ -157,15 +160,21 @@ class DashboardScreen extends ConsumerWidget {
     );
 
     if (saved == true && context.mounted) {
-      _invalidateExpenseData(ref);
+      await _refreshExpenseData(ref);
     }
   }
 
-  void _invalidateExpenseData(WidgetRef ref) {
+  Future<void> _refreshExpenseData(WidgetRef ref) async {
     ref.invalidate(budgetSnapshotProvider);
     ref.invalidate(recentExpensesProvider);
     ref.invalidate(expenseHistoryProvider);
     ref.invalidate(categorySpendingProvider);
+
+    await Future.wait([
+      ref.read(budgetSnapshotProvider.future),
+      ref.read(recentExpensesProvider.future),
+      ref.read(categorySpendingProvider.future),
+    ]);
   }
 }
 
@@ -342,7 +351,8 @@ class _DashboardHeroCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final snapshot = ref.watch(budgetSnapshotProvider).asData?.value;
-    final currency = ref.watch(userProfileProvider).asData?.value.currency ?? 'USD';
+    final currency =
+        ref.watch(userProfileProvider).asData?.value.currency ?? 'USD';
     final formatter = NumberFormat.simpleCurrency(name: currency);
     final dailyLimit = snapshot?.dailyLimit;
     final daysLeft = snapshot?.daysLeft;

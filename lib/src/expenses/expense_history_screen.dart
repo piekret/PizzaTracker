@@ -39,7 +39,7 @@ class _ExpenseHistoryScreenState extends ConsumerState<ExpenseHistoryScreen> {
             onPressed: () => showReceiptUploadFlow(
               context: context,
               ref: ref,
-              onExpenseSaved: _invalidateExpenseData,
+              onExpenseSaved: _refreshExpenseData,
             ),
             icon: const Icon(Icons.document_scanner_outlined),
             label: const Text('Add receipt'),
@@ -58,16 +58,16 @@ class _ExpenseHistoryScreenState extends ConsumerState<ExpenseHistoryScreen> {
           child: Column(
             children: [
               _ExpenseHistoryHeader(onBack: () => Navigator.of(context).pop()),
-                Padding(
-                  padding: EdgeInsets.fromLTRB(
-                    _responsiveGutter(context),
-                    12,
-                    _responsiveGutter(context),
-                    10,
-                  ),
-                  child: _HistoryFilters(
-                    searchController: _searchController,
-                    category: _category,
+              Padding(
+                padding: EdgeInsets.fromLTRB(
+                  _responsiveGutter(context),
+                  12,
+                  _responsiveGutter(context),
+                  10,
+                ),
+                child: _HistoryFilters(
+                  searchController: _searchController,
+                  category: _category,
                   onSearchChanged: () => setState(() {}),
                   onCategoryChanged: (value) {
                     setState(() => _category = value);
@@ -174,7 +174,7 @@ class _ExpenseHistoryScreenState extends ConsumerState<ExpenseHistoryScreen> {
     );
 
     if (saved == true && context.mounted) {
-      _invalidateExpenseData();
+      await _refreshExpenseData();
     }
   }
 
@@ -191,7 +191,7 @@ class _ExpenseHistoryScreenState extends ConsumerState<ExpenseHistoryScreen> {
     );
 
     if (saved == true && context.mounted) {
-      _invalidateExpenseData();
+      await _refreshExpenseData();
     }
   }
 
@@ -226,7 +226,7 @@ class _ExpenseHistoryScreenState extends ConsumerState<ExpenseHistoryScreen> {
       if (!context.mounted) {
         return;
       }
-      _invalidateExpenseData();
+      await _refreshExpenseData();
     } catch (error) {
       if (!context.mounted) {
         return;
@@ -235,11 +235,18 @@ class _ExpenseHistoryScreenState extends ConsumerState<ExpenseHistoryScreen> {
     }
   }
 
-  void _invalidateExpenseData() {
+  Future<void> _refreshExpenseData() async {
     ref.invalidate(expenseHistoryProvider);
     ref.invalidate(recentExpensesProvider);
     ref.invalidate(categorySpendingProvider);
     ref.invalidate(budgetSnapshotProvider);
+
+    await Future.wait([
+      ref.read(expenseHistoryProvider.future),
+      ref.read(recentExpensesProvider.future),
+      ref.read(categorySpendingProvider.future),
+      ref.read(budgetSnapshotProvider.future),
+    ]);
   }
 }
 
@@ -384,11 +391,7 @@ class _HistorySummary extends StatelessWidget {
           if (isNarrow) {
             return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                content,
-                const SizedBox(height: 8),
-                pill,
-              ],
+              children: [content, const SizedBox(height: 8), pill],
             );
           }
 

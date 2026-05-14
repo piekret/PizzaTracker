@@ -5,17 +5,13 @@ class AuthGate extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final client = ref.watch(supabaseClientProvider);
+    final user = ref.watch(authUserProvider);
 
-    return StreamBuilder<AuthState>(
-      stream: client.auth.onAuthStateChange,
-      builder: (context, snapshot) {
-        final session = snapshot.data?.session ?? client.auth.currentSession;
-        if (session == null) {
-          return const AuthScreen();
-        }
-        return const DashboardScreen();
-      },
+    return user.when(
+      data: (value) =>
+          value == null ? const AuthScreen() : const DashboardScreen(),
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (error, stackTrace) => const AuthScreen(),
     );
   }
 }

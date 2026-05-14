@@ -3,7 +3,7 @@ part of '../pizza_tracker_app.dart';
 Future<void> showReceiptUploadFlow({
   required BuildContext context,
   required WidgetRef ref,
-  required VoidCallback onExpenseSaved,
+  required Future<void> Function() onExpenseSaved,
 }) async {
   final source = await showModalBottomSheet<ImageSource>(
     context: context,
@@ -101,15 +101,12 @@ Future<void> showReceiptUploadFlow({
           );
         }
 
-        return AddExpenseSheet(
-          receipt: receipt,
-          receiptAnalysis: analysis,
-        );
+        return AddExpenseSheet(receipt: receipt, receiptAnalysis: analysis);
       },
     );
 
     if (saved == true) {
-      onExpenseSaved();
+      await onExpenseSaved();
       return;
     }
 

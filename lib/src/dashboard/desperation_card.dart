@@ -1,10 +1,15 @@
 part of '../pizza_tracker_app.dart';
 
 class _DesperationCard extends StatelessWidget {
-  const _DesperationCard({required this.snapshot, required this.currency});
+  const _DesperationCard({
+    required this.snapshot,
+    required this.currency,
+    required this.onRefresh,
+  });
 
   final BudgetSnapshot? snapshot;
   final String currency;
+  final Future<void> Function() onRefresh;
 
   @override
   Widget build(BuildContext context) {
@@ -43,17 +48,26 @@ class _DesperationCard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Wrap(
-                    spacing: 10,
-                    runSpacing: 10,
-                    crossAxisAlignment: WrapCrossAlignment.center,
-                    alignment: WrapAlignment.spaceBetween,
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Kicker('Desperation Index'),
-                      SoftPill(
-                        label: level.shortLabel,
-                        icon: level.icon,
-                        color: level.color,
+                      const Expanded(child: Kicker('Desperation Index')),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: [
+                          SoftPill(
+                            label: level.shortLabel,
+                            icon: level.icon,
+                            color: level.color,
+                          ),
+                          IconButton.filledTonal(
+                            tooltip: 'Update budget snapshot',
+                            onPressed: onRefresh,
+                            icon: const Icon(Icons.refresh_rounded),
+                          ),
+                        ],
                       ),
                     ],
                   ),
@@ -96,7 +110,9 @@ class _DesperationCard extends StatelessWidget {
                     child: LinearProgressIndicator(
                       value: progress,
                       minHeight: 10,
-                      backgroundColor: context.palette.border.withValues(alpha: 0.42),
+                      backgroundColor: context.palette.border.withValues(
+                        alpha: 0.42,
+                      ),
                       valueColor: AlwaysStoppedAnimation(level.color),
                     ),
                   ),

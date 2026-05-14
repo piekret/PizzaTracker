@@ -9,7 +9,17 @@ final supabaseClientProvider = Provider<SupabaseClient>((ref) {
   return Supabase.instance.client;
 });
 
+final authUserProvider = StreamProvider<User?>((ref) async* {
+  final auth = ref.watch(supabaseClientProvider).auth;
+  yield auth.currentUser;
+
+  await for (final state in auth.onAuthStateChange) {
+    yield state.session?.user;
+  }
+});
+
 final appRepositoryProvider = Provider<AppRepository>((ref) {
+  ref.watch(authUserProvider.select((user) => user.asData?.value?.id));
   return AppRepository(ref.watch(supabaseClientProvider));
 });
 
@@ -62,27 +72,38 @@ final incomeEventsProvider = FutureProvider<List<IncomeEvent>>((ref) async {
   return ref.watch(appRepositoryProvider).getIncomeEvents();
 });
 
-final recipeGeneratorProvider = FutureProvider.family<
-    List<RecipeSuggestion>, RecipeRequest>((ref, request) async {
-  return ref.watch(appRepositoryProvider).generateRecipes(
-        ingredients: request.ingredients,
-        desperationIndex: request.desperationIndex,
-      );
-});
+final recipeGeneratorProvider =
+    FutureProvider.family<List<RecipeSuggestion>, RecipeRequest>((
+      ref,
+      request,
+    ) async {
+      return ref
+          .watch(appRepositoryProvider)
+          .generateRecipes(
+            ingredients: request.ingredients,
+            desperationIndex: request.desperationIndex,
+          );
+    });
 
-final insightsProvider = FutureProvider.family<
-    InsightsResponse, InsightsRequest>((ref, request) async {
-  return ref.watch(appRepositoryProvider).generateInsights(
-        month: request.month,
-      );
-});
+final insightsProvider =
+    FutureProvider.family<InsightsResponse, InsightsRequest>((
+      ref,
+      request,
+    ) async {
+      return ref
+          .watch(appRepositoryProvider)
+          .generateInsights(month: request.month);
+    });
 
-final insightsRefreshProvider = FutureProvider.family<
-    InsightsResponse, InsightsRequest>((ref, request) async {
-  return ref.watch(appRepositoryProvider).refreshInsights(
-        month: request.month,
-      );
-});
+final insightsRefreshProvider =
+    FutureProvider.family<InsightsResponse, InsightsRequest>((
+      ref,
+      request,
+    ) async {
+      return ref
+          .watch(appRepositoryProvider)
+          .refreshInsights(month: request.month);
+    });
 
 const expenseCategories = ['food', 'alcohol', 'hygiene', 'fun', 'other'];
 const receiptImagesBucket = 'receipt-images';
@@ -145,26 +166,77 @@ class AppRepository {
         .eq('id', user.id);
   }
 
-  Future<BudgetSnapshot?> getBudgetSnapshot() async {
-    await ensureProfile();
+  Future<BudgetSnapshot?> getBudgetSnapshot({DateTime? onDate}) async {
+    final user = _requireUser();
+    final profile = await getProfile();
+    final date = onDate ?? DateTime.now();
+    final today = DateTime(date.year, date.month, date.day);
+    final period = _budgetPeriodFor(today, profile.budgetResetDay);
+    final dateFormat = DateFormat('yyyy-MM-dd');
 
-    final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
-    final data = await _client.rpc(
-      'get_budget_snapshot',
-      params: {'p_on_date': today},
-    );
+    final fixedRows = await _client
+        .from('fixed_expenses')
+        .select('amount')
+        .eq('user_id', user.id)
+        .eq('is_active', true);
+    final fixedMonthlyExpenses = fixedRows.fold<double>(0, (sum, row) {
+      return sum + _toDouble(Map<String, dynamic>.from(row)['amount']);
+    });
 
-    if (data is List && data.isNotEmpty) {
-      return BudgetSnapshot.fromMap(
-        Map<String, dynamic>.from(data.first as Map),
+    final expenseRows = await _client
+        .from('expense_items')
+        .select('amount')
+        .eq('user_id', user.id)
+        .gte('expense_date', dateFormat.format(period.start))
+        .lte('expense_date', dateFormat.format(period.end));
+    final spentThisPeriod = expenseRows.fold<double>(0, (sum, row) {
+      return sum + _toDouble(Map<String, dynamic>.from(row)['amount']);
+    });
+
+    final disposableBudget = (profile.monthlyBudget - fixedMonthlyExpenses)
+        .clamp(0, double.infinity)
+        .toDouble();
+    final remainingBudget = disposableBudget - spentThisPeriod;
+    final daysLeft = (period.end.difference(today).inDays + 1).clamp(0, 1000);
+    final totalDays = period.end.difference(period.start).inDays + 1;
+    final dailyLimit = remainingBudget / daysLeft.clamp(1, 1000);
+    final idealDaily = disposableBudget / totalDays.clamp(1, 1000);
+
+    var desperation = 0;
+    if (disposableBudget > 0 && idealDaily > 0) {
+      final dailyPressure = ((idealDaily - dailyLimit) / idealDaily).clamp(
+        0.0,
+        1.0,
       );
+      final expectedRemaining = idealDaily * daysLeft.clamp(1, 1000);
+      final schedulePressure =
+          ((expectedRemaining - remainingBudget) / disposableBudget).clamp(
+            0.0,
+            1.0,
+          );
+      final overBudgetPressure = remainingBudget < 0
+          ? ((-remainingBudget) / disposableBudget).clamp(0.0, double.infinity)
+          : 0.0;
+      desperation =
+          ((dailyPressure * 30) +
+                  (schedulePressure * 60) +
+                  (overBudgetPressure * 70))
+              .round()
+              .clamp(0, 100);
+    } else if (remainingBudget < 0) {
+      desperation = 100;
     }
 
-    if (data is Map) {
-      return BudgetSnapshot.fromMap(Map<String, dynamic>.from(data));
-    }
-
-    return null;
+    return BudgetSnapshot(
+      monthlyBudget: profile.monthlyBudget,
+      fixedMonthlyExpenses: fixedMonthlyExpenses,
+      disposableBudget: disposableBudget,
+      spentThisPeriod: spentThisPeriod,
+      remainingBudget: remainingBudget,
+      daysLeft: daysLeft,
+      dailyLimit: dailyLimit,
+      desperationIndex: desperation,
+    );
   }
 
   Future<List<ExpenseItem>> getRecentExpenses() async {
@@ -612,10 +684,7 @@ class AppRepository {
     _requireUser();
     final response = await _client.functions.invoke(
       'generate-recipes',
-      body: {
-        'ingredients': ingredients,
-        'desperationIndex': desperationIndex,
-      },
+      body: {'ingredients': ingredients, 'desperationIndex': desperationIndex},
     );
 
     final map = _responseMap(response.data);
@@ -630,9 +699,10 @@ class AppRepository {
 
     return rawRecipes
         .whereType<Map>()
-        .map((recipe) => RecipeSuggestion.fromMap(
-              Map<String, dynamic>.from(recipe),
-            ))
+        .map(
+          (recipe) =>
+              RecipeSuggestion.fromMap(Map<String, dynamic>.from(recipe)),
+        )
         .where((recipe) => recipe.name.isNotEmpty)
         .toList();
   }
@@ -641,9 +711,7 @@ class AppRepository {
     _requireUser();
     final response = await _client.functions.invoke(
       'generate-insights',
-      body: {
-        'month': month,
-      },
+      body: {'month': month},
     );
 
     final map = _responseMap(response.data);
@@ -659,10 +727,7 @@ class AppRepository {
     _requireUser();
     final response = await _client.functions.invoke(
       'generate-insights',
-      body: {
-        'month': month,
-        'force': true,
-      },
+      body: {'month': month, 'force': true},
     );
 
     final map = _responseMap(response.data);
@@ -1138,18 +1203,22 @@ class MonthlyInsights {
   factory MonthlyInsights.fromMap(Map<String, dynamic> map) {
     return MonthlyInsights(
       summary: map['summary']?.toString() ?? '',
-      absurdPurchases: (map['absurd_purchases'] as List?)
+      absurdPurchases:
+          (map['absurd_purchases'] as List?)
               ?.whereType<Map>()
-              .map((item) => AbsurdPurchase.fromMap(
-                    Map<String, dynamic>.from(item),
-                  ))
+              .map(
+                (item) =>
+                    AbsurdPurchase.fromMap(Map<String, dynamic>.from(item)),
+              )
               .toList() ??
           const [],
-      categoryCallouts: (map['category_callouts'] as List?)
+      categoryCallouts:
+          (map['category_callouts'] as List?)
               ?.whereType<Map>()
-              .map((item) => CategoryCallout.fromMap(
-                    Map<String, dynamic>.from(item),
-                  ))
+              .map(
+                (item) =>
+                    CategoryCallout.fromMap(Map<String, dynamic>.from(item)),
+              )
               .toList() ??
           const [],
     );

@@ -25,7 +25,7 @@ class _ReceiptReviewSheetState extends ConsumerState<ReceiptReviewSheet> {
   @override
   void initState() {
     super.initState();
-    _expenseDate = widget.analysis.expenseDate ?? DateTime.now();
+    _expenseDate = DateTime.now();
     _items = widget.analysis.items
         .map((item) => _ReceiptItemDraft.fromAnalysis(item))
         .toList();
@@ -76,6 +76,8 @@ class _ReceiptReviewSheetState extends ConsumerState<ReceiptReviewSheet> {
             expenses: expenses,
           );
 
+      await _refreshExpenseData();
+
       if (mounted) {
         _showSavedToast();
         Navigator.of(context).pop(true);
@@ -87,6 +89,19 @@ class _ReceiptReviewSheetState extends ConsumerState<ReceiptReviewSheet> {
         setState(() => _isSaving = false);
       }
     }
+  }
+
+  Future<void> _refreshExpenseData() async {
+    ref.invalidate(budgetSnapshotProvider);
+    ref.invalidate(recentExpensesProvider);
+    ref.invalidate(expenseHistoryProvider);
+    ref.invalidate(categorySpendingProvider);
+
+    await Future.wait([
+      ref.read(budgetSnapshotProvider.future),
+      ref.read(recentExpensesProvider.future),
+      ref.read(categorySpendingProvider.future),
+    ]);
   }
 
   void _showSavedToast() {
@@ -115,8 +130,12 @@ class _ReceiptReviewSheetState extends ConsumerState<ReceiptReviewSheet> {
     final formatter = NumberFormat.simpleCurrency(name: currency);
     final confidence = widget.analysis.confidence;
     final receiptTotal = widget.analysis.totalAmount;
-    final difference = receiptTotal == null ? null : (receiptTotal - _total).abs();
-    final showMismatch = receiptTotal != null && difference != null &&
+    final difference = receiptTotal == null
+        ? null
+        : (receiptTotal - _total).abs();
+    final showMismatch =
+        receiptTotal != null &&
+        difference != null &&
         difference >= (receiptTotal * 0.02).clamp(0.5, double.infinity);
 
     return AppSheetFrame(
@@ -147,7 +166,7 @@ class _ReceiptReviewSheetState extends ConsumerState<ReceiptReviewSheet> {
             ),
             const SizedBox(height: 12),
             Text(
-              'Check names, amounts, and categories before saving. These will become separate expense rows tied to this receipt.',
+              'Check names, amounts, categories, and date before saving. These will become separate expense rows tied to this receipt.',
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                 color: Theme.of(context).colorScheme.onSurfaceVariant,
                 height: 1.35,

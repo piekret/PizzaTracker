@@ -96,6 +96,35 @@ void main() {
     });
   });
 
+  group('UserProfile', () {
+    test('defaults missing onboarding flag to false', () {
+      final profile = UserProfile.fromMap({
+        'id': 'user-id',
+        'display_name': 'Tester',
+        'monthly_budget': 0,
+        'budget_reset_day': 1,
+        'currency': 'USD',
+        'timezone': 'Europe/Warsaw',
+      });
+
+      expect(profile.onboardingCompleted, isFalse);
+    });
+
+    test('parses completed onboarding flag', () {
+      final profile = UserProfile.fromMap({
+        'id': 'user-id',
+        'display_name': 'Tester',
+        'monthly_budget': 1200,
+        'budget_reset_day': 1,
+        'currency': 'USD',
+        'timezone': 'Europe/Warsaw',
+        'onboarding_completed': true,
+      });
+
+      expect(profile.onboardingCompleted, isTrue);
+    });
+  });
+
   group('AI request cache keys', () {
     test('recipe requests include language', () {
       const english = RecipeRequest(

@@ -90,6 +90,7 @@ void main() {
               budgetResetDay: 1,
               currency: 'USD',
               timezone: 'Europe/Warsaw',
+              onboardingCompleted: true,
             );
           }),
           budgetSnapshotProvider.overrideWith((ref) async {
@@ -239,6 +240,7 @@ void main() {
               budgetResetDay: 1,
               currency: 'USD',
               timezone: 'Europe/Warsaw',
+              onboardingCompleted: true,
             );
           }),
           budgetSnapshotProvider.overrideWith((ref) async {
@@ -321,6 +323,88 @@ void main() {
     }
   });
 
+  testWidgets('renders onboarding setup for missing budget', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(320, 760));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await tester.pumpWidget(
+      ProviderScope(
+        child: MaterialApp(
+          theme: buildAppTheme(AppThemePreset.pizza),
+          home: const OnboardingSetupScreen(
+            profile: UserProfile(
+              id: 'user-id',
+              displayName: 'Tester',
+              monthlyBudget: 0,
+              budgetResetDay: 1,
+              currency: 'USD',
+              timezone: 'Europe/Warsaw',
+              onboardingCompleted: false,
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    expect(find.text('Set the basics in one minute'), findsOneWidget);
+    expect(find.text('Your monthly budget'), findsOneWidget);
+
+    await tester.scrollUntilVisible(
+      find.text('Add your biggest fixed cost'),
+      500,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(find.text('Add your biggest fixed cost'), findsOneWidget);
+
+    await tester.scrollUntilVisible(
+      find.text('Add regular income'),
+      500,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(find.text('Add regular income'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('onboarding requires a positive monthly budget', (tester) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        child: MaterialApp(
+          theme: buildAppTheme(AppThemePreset.pizza),
+          home: const OnboardingSetupScreen(
+            profile: UserProfile(
+              id: 'user-id',
+              displayName: 'Tester',
+              monthlyBudget: 0,
+              budgetResetDay: 1,
+              currency: 'USD',
+              timezone: 'Europe/Warsaw',
+              onboardingCompleted: false,
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.text('Save and open dashboard'),
+      500,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.tap(find.text('Save and open dashboard'));
+    await tester.pumpAndSettle();
+
+    await tester.scrollUntilVisible(
+      find.text('Enter a budget above 0.'),
+      -500,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(find.text('Enter a budget above 0.'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('prefills expense sheet from receipt analysis', (tester) async {
     await tester.pumpWidget(
       ProviderScope(
@@ -379,6 +463,7 @@ void main() {
               budgetResetDay: 1,
               currency: 'USD',
               timezone: 'Europe/Warsaw',
+              onboardingCompleted: true,
             );
           }),
         ],

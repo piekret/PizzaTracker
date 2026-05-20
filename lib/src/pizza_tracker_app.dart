@@ -30,6 +30,7 @@ part 'expenses/receipt_review_sheet.dart';
 part 'expenses/receipt_upload_flow.dart';
 part 'planning/planning_sheets.dart';
 part 'shared/setup_screen.dart';
+part 'shared/onboarding_screen.dart';
 part 'shared/status_widgets.dart';
 part 'shared/ui_helpers.dart';
 

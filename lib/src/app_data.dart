@@ -134,6 +134,7 @@ class AppRepository {
             'budget_reset_day': 1,
             'currency': 'USD',
             'timezone': 'Europe/Warsaw',
+            'onboarding_completed': false,
           },
           onConflict: 'id',
           ignoreDuplicates: true,
@@ -147,7 +148,7 @@ class AppRepository {
     final row = await _client
         .from('users_profiles')
         .select(
-          'id, display_name, monthly_budget, budget_reset_day, currency, timezone',
+          'id, display_name, monthly_budget, budget_reset_day, currency, timezone, onboarding_completed',
         )
         .eq('id', user.id)
         .single();
@@ -159,6 +160,7 @@ class AppRepository {
     required double monthlyBudget,
     required int budgetResetDay,
     required String currency,
+    bool onboardingCompleted = false,
   }) async {
     final user = _requireUser();
     await ensureProfile();
@@ -169,6 +171,7 @@ class AppRepository {
           'monthly_budget': monthlyBudget,
           'budget_reset_day': budgetResetDay,
           'currency': currency.trim().toUpperCase(),
+          if (onboardingCompleted) 'onboarding_completed': true,
         })
         .eq('id', user.id);
   }
@@ -811,6 +814,7 @@ class UserProfile {
     required this.budgetResetDay,
     required this.currency,
     required this.timezone,
+    required this.onboardingCompleted,
   });
 
   final String id;
@@ -819,6 +823,7 @@ class UserProfile {
   final int budgetResetDay;
   final String currency;
   final String timezone;
+  final bool onboardingCompleted;
 
   factory UserProfile.fromMap(Map<String, dynamic> map) {
     return UserProfile(
@@ -828,6 +833,7 @@ class UserProfile {
       budgetResetDay: _toInt(map['budget_reset_day']),
       currency: (map['currency'] as String?) ?? 'USD',
       timezone: (map['timezone'] as String?) ?? 'Europe/Warsaw',
+      onboardingCompleted: (map['onboarding_completed'] as bool?) ?? false,
     );
   }
 }

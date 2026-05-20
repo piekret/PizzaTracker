@@ -21,6 +21,7 @@ create table if not exists public.users_profiles(
   budget_reset_day integer not null default 1,
   currency text not null default 'USD',
   timezone text not null default 'Europe/Warsaw',
+  onboarding_completed boolean not null default false,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   constraint users_profiles_monthly_budget_check check (monthly_budget >= 0),
@@ -113,6 +114,9 @@ create table if not exists public.recipe_generations(
 alter table public.receipts
   add column if not exists raw_ocr_text text,
   add column if not exists analysis_json jsonb;
+
+alter table public.users_profiles
+  add column if not exists onboarding_completed boolean not null default false;
 
 alter table public.expense_items
   add column if not exists receipt_id uuid references public.receipts(id) on delete set null;

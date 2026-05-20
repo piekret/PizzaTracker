@@ -24,6 +24,7 @@ class _DesperationCard extends StatelessWidget {
 
     return FrostPanel(
       padding: EdgeInsets.zero,
+      radius: 28,
       child: ClipRRect(
         borderRadius: BorderRadius.circular(28),
         child: Stack(

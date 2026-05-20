@@ -248,7 +248,7 @@ class _ExpenseRow extends StatelessWidget {
         ),
         const SizedBox(height: 3),
         Text(
-          '${_categoryLabel(expense.category)} - ${DateFormat.yMMMd(context.text.appLanguage.code).format(expense.expenseDate)}',
+          '${_categoryLabel(expense.category)} - ${MaterialLocalizations.of(context).formatMediumDate(expense.expenseDate)}',
           style: Theme.of(context).textTheme.bodySmall?.copyWith(
             color: Theme.of(context).colorScheme.onSurfaceVariant,
           ),

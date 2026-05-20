@@ -57,6 +57,7 @@ class _AddFixedExpenseSheetState extends ConsumerState<AddFixedExpenseSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final text = context.text;
     return AppSheetFrame(
       child: Form(
         key: _formKey,
@@ -64,23 +65,25 @@ class _AddFixedExpenseSheetState extends ConsumerState<AddFixedExpenseSheet> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Kicker('Monthly fixed cost'),
+            Kicker(
+              text.isPolish ? 'Stały koszt miesięczny' : 'Monthly fixed cost',
+            ),
             const SizedBox(height: 8),
             Text(
-              'Add fixed cost',
+              text.isPolish ? 'Dodaj stały koszt' : 'Add fixed cost',
               style: Theme.of(context).textTheme.headlineMedium,
             ),
             const SizedBox(height: 16),
             TextFormField(
               controller: _nameController,
-              decoration: const InputDecoration(
-                labelText: 'Name',
-                prefixIcon: Icon(Icons.home_work_outlined),
+              decoration: InputDecoration(
+                labelText: text.name,
+                prefixIcon: const Icon(Icons.home_work_outlined),
               ),
               textInputAction: TextInputAction.next,
               validator: (value) {
                 if (value == null || value.trim().isEmpty) {
-                  return 'Name is required.';
+                  return text.nameRequired;
                 }
                 return null;
               },
@@ -88,9 +91,11 @@ class _AddFixedExpenseSheetState extends ConsumerState<AddFixedExpenseSheet> {
             const SizedBox(height: 12),
             TextFormField(
               controller: _amountController,
-              decoration: const InputDecoration(
-                labelText: 'Monthly amount',
-                prefixIcon: Icon(Icons.payments_outlined),
+              decoration: InputDecoration(
+                labelText: text.isPolish
+                    ? 'Kwota miesięczna'
+                    : 'Monthly amount',
+                prefixIcon: const Icon(Icons.payments_outlined),
               ),
               keyboardType: const TextInputType.numberWithOptions(
                 decimal: true,
@@ -100,9 +105,9 @@ class _AddFixedExpenseSheetState extends ConsumerState<AddFixedExpenseSheet> {
             const SizedBox(height: 12),
             TextFormField(
               controller: _billingDayController,
-              decoration: const InputDecoration(
-                labelText: 'Billing day',
-                prefixIcon: Icon(Icons.event_repeat_outlined),
+              decoration: InputDecoration(
+                labelText: text.isPolish ? 'Dzień rozliczenia' : 'Billing day',
+                prefixIcon: const Icon(Icons.event_repeat_outlined),
               ),
               keyboardType: TextInputType.number,
               validator: _validateMonthDay,
@@ -119,7 +124,9 @@ class _AddFixedExpenseSheetState extends ConsumerState<AddFixedExpenseSheet> {
                       dimension: 18,
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
-                  : const Text('Save fixed cost'),
+                  : Text(
+                      text.isPolish ? 'Zapisz stały koszt' : 'Save fixed cost',
+                    ),
             ),
           ],
         ),
@@ -187,6 +194,7 @@ class _AddIncomeEventSheetState extends ConsumerState<AddIncomeEventSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final text = context.text;
     return AppSheetFrame(
       child: Form(
         key: _formKey,
@@ -194,23 +202,23 @@ class _AddIncomeEventSheetState extends ConsumerState<AddIncomeEventSheet> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Kicker('Incoming money'),
+            Kicker(text.isPolish ? 'Przychodzące pieniądze' : 'Incoming money'),
             const SizedBox(height: 8),
             Text(
-              'Add income',
+              text.isPolish ? 'Dodaj wpływ' : 'Add income',
               style: Theme.of(context).textTheme.headlineMedium,
             ),
             const SizedBox(height: 16),
             TextFormField(
               controller: _nameController,
-              decoration: const InputDecoration(
-                labelText: 'Name',
-                prefixIcon: Icon(Icons.work_outline),
+              decoration: InputDecoration(
+                labelText: text.name,
+                prefixIcon: const Icon(Icons.work_outline),
               ),
               textInputAction: TextInputAction.next,
               validator: (value) {
                 if (value == null || value.trim().isEmpty) {
-                  return 'Name is required.';
+                  return text.nameRequired;
                 }
                 return null;
               },
@@ -218,9 +226,9 @@ class _AddIncomeEventSheetState extends ConsumerState<AddIncomeEventSheet> {
             const SizedBox(height: 12),
             TextFormField(
               controller: _amountController,
-              decoration: const InputDecoration(
-                labelText: 'Amount',
-                prefixIcon: Icon(Icons.payments_outlined),
+              decoration: InputDecoration(
+                labelText: text.amount,
+                prefixIcon: const Icon(Icons.payments_outlined),
               ),
               keyboardType: const TextInputType.numberWithOptions(
                 decimal: true,
@@ -230,9 +238,9 @@ class _AddIncomeEventSheetState extends ConsumerState<AddIncomeEventSheet> {
             const SizedBox(height: 12),
             TextFormField(
               controller: _expectedDayController,
-              decoration: const InputDecoration(
-                labelText: 'Expected day',
-                prefixIcon: Icon(Icons.event_available_outlined),
+              decoration: InputDecoration(
+                labelText: text.isPolish ? 'Oczekiwany dzień' : 'Expected day',
+                prefixIcon: const Icon(Icons.event_available_outlined),
               ),
               keyboardType: TextInputType.number,
               validator: _validateMonthDay,
@@ -242,8 +250,16 @@ class _AddIncomeEventSheetState extends ConsumerState<AddIncomeEventSheet> {
               contentPadding: EdgeInsets.zero,
               value: _isRecurring,
               onChanged: (value) => setState(() => _isRecurring = value),
-              title: const Text('Repeats every month'),
-              subtitle: const Text('Turn off for one-time transfers.'),
+              title: Text(
+                text.isPolish
+                    ? 'Powtarza się co miesiąc'
+                    : 'Repeats every month',
+              ),
+              subtitle: Text(
+                text.isPolish
+                    ? 'Wyłącz dla jednorazowych przelewów.'
+                    : 'Turn off for one-time transfers.',
+              ),
             ),
             if (_error != null) ...[
               const SizedBox(height: 12),
@@ -257,7 +273,7 @@ class _AddIncomeEventSheetState extends ConsumerState<AddIncomeEventSheet> {
                       dimension: 18,
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
-                  : const Text('Save income'),
+                  : Text(text.isPolish ? 'Zapisz wpływ' : 'Save income'),
             ),
           ],
         ),

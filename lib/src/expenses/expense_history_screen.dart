@@ -42,14 +42,14 @@ class _ExpenseHistoryScreenState extends ConsumerState<ExpenseHistoryScreen> {
               onExpenseSaved: _refreshExpenseData,
             ),
             icon: const Icon(Icons.document_scanner_outlined),
-            label: const Text('Add receipt'),
+            label: Text(context.text.addReceipt),
           ),
           const SizedBox(height: 10),
           FloatingActionButton.extended(
             heroTag: 'history-add-expense',
             onPressed: () => _showAddExpense(context),
             icon: const Icon(Icons.add_rounded),
-            label: const Text('Add expense'),
+            label: Text(context.text.addExpense),
           ),
         ],
       ),
@@ -124,9 +124,11 @@ class _ExpenseHistoryScreenState extends ConsumerState<ExpenseHistoryScreen> {
                       ),
                     );
                   },
-                  loading: () => const Padding(
-                    padding: EdgeInsets.all(16),
-                    child: _LoadingCard(label: 'Loading expense history...'),
+                  loading: () => Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: _LoadingCard(
+                      label: context.text.loadingExpenseHistory,
+                    ),
                   ),
                   error: (error, stackTrace) => Padding(
                     padding: const EdgeInsets.all(16),
@@ -201,16 +203,16 @@ class _ExpenseHistoryScreenState extends ConsumerState<ExpenseHistoryScreen> {
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: const Text('Delete expense?'),
-          content: Text('Remove ${expense.name} from your budget history?'),
+          title: Text(context.text.deleteExpenseQuestion),
+          content: Text(context.text.removeExpenseFromHistory(expense.name)),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('Cancel'),
+              child: Text(context.text.cancel),
             ),
             FilledButton.tonal(
               onPressed: () => Navigator.of(context).pop(true),
-              child: const Text('Delete'),
+              child: Text(context.text.delete),
             ),
           ],
         );
@@ -231,7 +233,9 @@ class _ExpenseHistoryScreenState extends ConsumerState<ExpenseHistoryScreen> {
       if (!context.mounted) {
         return;
       }
-      messenger.showSnackBar(SnackBar(content: Text(error.toString())));
+      messenger.showSnackBar(
+        SnackBar(content: Text(context.text.translateKnown(error.toString()))),
+      );
     }
   }
 
@@ -263,7 +267,7 @@ class _ExpenseHistoryHeader extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           _RoundIconButton(
-            tooltip: 'Back',
+            tooltip: context.text.back,
             icon: Icons.arrow_back_rounded,
             onPressed: onBack,
           ),
@@ -272,10 +276,10 @@ class _ExpenseHistoryHeader extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Kicker('Full ledger'),
+                Kicker(context.text.isPolish ? 'Pełny rejestr' : 'Full ledger'),
                 const SizedBox(height: 4),
                 Text(
-                  'Expense history',
+                  context.text.expenseHistory,
                   style: Theme.of(context).textTheme.titleLarge,
                 ),
               ],
@@ -310,9 +314,9 @@ class _HistoryFilters extends StatelessWidget {
           TextField(
             controller: searchController,
             onChanged: (_) => onSearchChanged(),
-            decoration: const InputDecoration(
-              labelText: 'Search expenses',
-              prefixIcon: Icon(Icons.search_rounded),
+            decoration: InputDecoration(
+              labelText: context.text.searchExpenses,
+              prefixIcon: const Icon(Icons.search_rounded),
             ),
           ),
           const SizedBox(height: 12),
@@ -321,7 +325,7 @@ class _HistoryFilters extends StatelessWidget {
             child: Row(
               children: [
                 _CategoryFilterChip(
-                  label: 'All',
+                  label: context.text.all,
                   selected: category == 'all',
                   onSelected: () => onCategoryChanged('all'),
                 ),
@@ -371,7 +375,7 @@ class _HistorySummary extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final label = count == 1 ? '1 expense' : '$count expenses';
+    final label = context.text.expenseCount(count);
 
     return FrostPanel(
       padding: const EdgeInsets.all(16),
@@ -382,7 +386,9 @@ class _HistorySummary extends StatelessWidget {
           final content = Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Kicker('Filtered total'),
+              Kicker(
+                context.text.isPolish ? 'Suma filtrowana' : 'Filtered total',
+              ),
               const SizedBox(height: 6),
               Text(label, style: Theme.of(context).textTheme.titleMedium),
             ],
@@ -431,14 +437,16 @@ class _HistoryEmpty extends StatelessWidget {
           ),
           const SizedBox(height: 10),
           Text(
-            hasFilters ? 'No matching expenses' : 'No expenses yet',
+            hasFilters
+                ? context.text.noMatchingExpenses
+                : context.text.noExpensesYet,
             style: Theme.of(context).textTheme.titleMedium,
           ),
           const SizedBox(height: 4),
           Text(
             hasFilters
-                ? 'Try a different search or category.'
-                : 'Add your first expense to start the ledger.',
+                ? context.text.tryDifferentSearch
+                : context.text.addFirstExpense,
             textAlign: TextAlign.center,
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
               color: Theme.of(context).colorScheme.onSurfaceVariant,

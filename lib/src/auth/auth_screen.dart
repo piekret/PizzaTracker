@@ -169,6 +169,7 @@ class _AuthBrandPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final text = context.text;
     return FrostPanel(
       padding: EdgeInsets.all(compact ? 22 : 30),
       child: Column(
@@ -181,7 +182,8 @@ class _AuthBrandPanel extends StatelessWidget {
               const SizedBox(width: 14),
               Expanded(
                 child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start, // Fixed analyzer issue
+                  crossAxisAlignment:
+                      CrossAxisAlignment.start, // Fixed analyzer issue
                   children: [
                     Text(
                       'PizzaTracker',
@@ -189,7 +191,7 @@ class _AuthBrandPanel extends StatelessWidget {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      'Student budget survival kit',
+                      text.authTagline,
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: Theme.of(context).colorScheme.onSurfaceVariant,
                       ),
@@ -199,13 +201,18 @@ class _AuthBrandPanel extends StatelessWidget {
               ),
             ],
           ),
+          if (compact) ...[
+            const SizedBox(height: 12),
+            const Align(
+              alignment: Alignment.centerRight,
+              child: _LanguageMenu(),
+            ),
+          ],
           SizedBox(height: compact ? 20 : 34),
-          const Kicker('Can I afford this?'),
+          Kicker(text.canIAffordThis),
           const SizedBox(height: 10),
           Text(
-            compact
-                ? 'Know if tonight is pizza night or pasta damage control.'
-                : 'Know if tonight is pizza night or pasta damage control before your bank account starts negotiating.',
+            compact ? text.authHeroShort : text.authHeroLong,
             style: compact
                 ? Theme.of(context).textTheme.headlineMedium
                 : Theme.of(context).textTheme.displayMedium,
@@ -214,20 +221,20 @@ class _AuthBrandPanel extends StatelessWidget {
             const SizedBox(height: 26),
             const _FeatureLine(
               icon: Icons.receipt_long_outlined,
-              title: 'Receipts become expenses',
-              text: 'Manual now, OCR next.',
+              titleKey: 'receiptsBecomeExpenses',
+              textKey: 'manualNowOcrNext',
             ),
             const SizedBox(height: 14),
             const _FeatureLine(
               icon: Icons.speed_outlined,
-              title: 'Desperation Index',
-              text: 'One brutal number for the rest of the month.',
+              titleKey: 'desperationIndex',
+              textKey: 'oneBrutalNumber',
             ),
             const SizedBox(height: 14),
             const _FeatureLine(
               icon: Icons.restaurant_menu_outlined,
-              title: 'Recipes later',
-              text: 'When the budget gets ugly.',
+              titleKey: 'recipesLater',
+              textKey: 'whenBudgetGetsUgly',
             ),
           ],
         ],
@@ -239,16 +246,29 @@ class _AuthBrandPanel extends StatelessWidget {
 class _FeatureLine extends StatelessWidget {
   const _FeatureLine({
     required this.icon,
-    required this.title,
-    required this.text,
+    required this.titleKey,
+    required this.textKey,
   });
 
   final IconData icon;
-  final String title;
-  final String text;
+  final String titleKey;
+  final String textKey;
 
   @override
   Widget build(BuildContext context) {
+    final text = context.text;
+    final title = switch (titleKey) {
+      'receiptsBecomeExpenses' => text.receiptsBecomeExpenses,
+      'desperationIndex' => text.desperationIndex,
+      'recipesLater' => text.recipesLater,
+      _ => titleKey,
+    };
+    final body = switch (textKey) {
+      'manualNowOcrNext' => text.manualNowOcrNext,
+      'oneBrutalNumber' => text.oneBrutalNumber,
+      'whenBudgetGetsUgly' => text.whenBudgetGetsUgly,
+      _ => textKey,
+    };
     return Row(
       children: [
         Container(
@@ -269,7 +289,7 @@ class _FeatureLine extends StatelessWidget {
               Text(title, style: Theme.of(context).textTheme.titleSmall),
               const SizedBox(height: 2),
               Text(
-                text,
+                body,
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: Theme.of(context).colorScheme.onSurfaceVariant,
                 ),
@@ -315,24 +335,35 @@ class _AuthFormPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final text = context.text;
     return FrostPanel(
       padding: const EdgeInsets.all(24),
       child: Form(
         key: formKey,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
-        mainAxisSize: MainAxisSize.min, // Fixed analyzer issue
+          mainAxisSize: MainAxisSize.min,
           children: [
-            const Kicker('Private beta'),
+            Kicker(text.isPolish ? 'Prywatna beta' : 'Private beta'),
             const SizedBox(height: 10),
             Text(
-              isSignUp ? 'Create account' : 'Welcome back',
+              isSignUp
+                  ? text.isPolish
+                        ? 'Utwórz konto'
+                        : 'Create account'
+                  : text.isPolish
+                  ? 'Witaj ponownie'
+                  : 'Welcome back',
               style: Theme.of(context).textTheme.headlineMedium,
             ),
             const SizedBox(height: 8),
             Text(
               isSignUp
-                  ? 'Start tracking before the pizza tracker becomes a debt tracker.'
+                  ? text.isPolish
+                        ? 'Zacznij śledzić wydatki, zanim tracker pizzy stanie się trackerem długów.'
+                        : 'Start tracking before the pizza tracker becomes a debt tracker.'
+                  : text.isPolish
+                  ? 'Zaloguj się i pozwól paragonom się wytłumaczyć.'
                   : 'Sign in and let the receipts explain themselves.',
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                 color: Theme.of(context).colorScheme.onSurfaceVariant,
@@ -342,15 +373,17 @@ class _AuthFormPanel extends StatelessWidget {
             const SizedBox(height: 22),
             TextFormField(
               controller: emailController,
-              decoration: const InputDecoration(
-                labelText: 'Email',
-                prefixIcon: Icon(Icons.alternate_email),
+              decoration: InputDecoration(
+                labelText: text.isPolish ? 'Email' : 'Email',
+                prefixIcon: const Icon(Icons.alternate_email),
               ),
               keyboardType: TextInputType.emailAddress,
               autofillHints: const [AutofillHints.email],
               validator: (value) {
                 if (value == null || !value.contains('@')) {
-                  return 'Enter a valid email.';
+                  return text.isPolish
+                      ? 'Podaj poprawny email.'
+                      : 'Enter a valid email.';
                 }
                 return null;
               },
@@ -359,10 +392,16 @@ class _AuthFormPanel extends StatelessWidget {
             TextFormField(
               controller: passwordController,
               decoration: InputDecoration(
-                labelText: 'Password',
+                labelText: text.isPolish ? 'Hasło' : 'Password',
                 prefixIcon: const Icon(Icons.lock_outline),
                 suffixIcon: IconButton(
-                  tooltip: obscurePassword ? 'Show password' : 'Hide password',
+                  tooltip: obscurePassword
+                      ? text.isPolish
+                            ? 'Pokaż hasło'
+                            : 'Show password'
+                      : text.isPolish
+                      ? 'Ukryj hasło'
+                      : 'Hide password',
                   onPressed: onTogglePassword,
                   icon: Icon(
                     obscurePassword ? Icons.visibility : Icons.visibility_off,
@@ -373,7 +412,9 @@ class _AuthFormPanel extends StatelessWidget {
               autofillHints: const [AutofillHints.password],
               validator: (value) {
                 if (value == null || value.length < 6) {
-                  return 'Use at least 6 characters.';
+                  return text.isPolish
+                      ? 'Użyj co najmniej 6 znaków.'
+                      : 'Use at least 6 characters.';
                 }
                 return null;
               },
@@ -383,11 +424,17 @@ class _AuthFormPanel extends StatelessWidget {
               TextFormField(
                 controller: confirmPasswordController,
                 decoration: InputDecoration(
-                  labelText: 'Confirm password',
+                  labelText: text.isPolish
+                      ? 'Potwierdź hasło'
+                      : 'Confirm password',
                   prefixIcon: const Icon(Icons.verified_user_outlined),
                   suffixIcon: IconButton(
                     tooltip: obscureConfirmPassword
-                        ? 'Show password'
+                        ? text.isPolish
+                              ? 'Pokaż hasło'
+                              : 'Show password'
+                        : text.isPolish
+                        ? 'Ukryj hasło'
                         : 'Hide password',
                     onPressed: onToggleConfirmPassword,
                     icon: Icon(
@@ -401,7 +448,9 @@ class _AuthFormPanel extends StatelessWidget {
                 autofillHints: const [AutofillHints.newPassword],
                 validator: (value) {
                   if (value != passwordController.text) {
-                    return 'Passwords do not match.';
+                    return text.isPolish
+                        ? 'Hasła nie są takie same.'
+                        : 'Passwords do not match.';
                   }
                   return null;
                 },
@@ -419,13 +468,27 @@ class _AuthFormPanel extends StatelessWidget {
                       dimension: 18,
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
-                  : Text(isSignUp ? 'Create account' : 'Sign in'),
+                  : Text(
+                      isSignUp
+                          ? text.isPolish
+                                ? 'Utwórz konto'
+                                : 'Create account'
+                          : text.isPolish
+                          ? 'Zaloguj się'
+                          : 'Sign in',
+                    ),
             ),
             const SizedBox(height: 8),
             TextButton(
               onPressed: isLoading ? null : onToggleMode,
               child: Text(
-                isSignUp ? 'I already have an account' : 'Create an account',
+                isSignUp
+                    ? text.isPolish
+                          ? 'Mam już konto'
+                          : 'I already have an account'
+                    : text.isPolish
+                    ? 'Utwórz konto'
+                    : 'Create an account',
               ),
             ),
           ],

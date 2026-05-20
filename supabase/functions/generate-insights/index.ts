@@ -3,7 +3,8 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.48.1";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type",
 };
 
 const insightsSchema = {
@@ -65,7 +66,9 @@ serve(async (req) => {
     }
 
     const admin = createClient(supabaseUrl, serviceRoleKey);
-    const { data: userData, error: userError } = await admin.auth.getUser(token);
+    const { data: userData, error: userError } = await admin.auth.getUser(
+      token,
+    );
     const user = userData.user;
     if (userError || !user) {
       return json({ error: "Invalid authorization token" }, 401);
@@ -74,6 +77,7 @@ serve(async (req) => {
     const payload = await req.json();
     const month = normalizeMonth(payload?.month);
     const force = payload?.force === true;
+    const language = normalizeLanguage(payload?.language);
     if (!month) {
       return json({ error: "Invalid month format. Use YYYY-MM." }, 400);
     }
@@ -85,12 +89,14 @@ serve(async (req) => {
       .select("payload_json")
       .eq("user_id", user.id)
       .eq("month", monthStart)
+      .eq("language", language)
       .maybeSingle();
 
     if (!force && cached.data?.payload_json) {
       return json({
         cached: true,
         month,
+        language,
         insights: cached.data.payload_json,
       });
     }
@@ -105,15 +111,16 @@ serve(async (req) => {
       .limit(250);
 
     if (!expenses || expenses.length == 0) {
-      const emptyInsights = buildEmptyInsights();
+      const emptyInsights = buildEmptyInsights(language);
       await admin.from("insights_monthly").upsert({
         user_id: user.id,
         month: monthStart,
+        language,
         payload_json: emptyInsights,
         updated_at: new Date().toISOString(),
-      });
+      }, { onConflict: "user_id,month,language" });
 
-      return json({ cached: false, month, insights: emptyInsights });
+      return json({ cached: false, month, language, insights: emptyInsights });
     }
 
     const inputSummary = summarizeExpenses(expenses ?? []);
@@ -130,8 +137,9 @@ serve(async (req) => {
           systemInstruction: {
             parts: [
               {
-                text:
-                  "You are a brutally honest student budget analyst. Return insights in JSON only. Keep summary to 1-2 short sentences. Absurd purchases should be humorous but grounded in the data.",
+                text: language === "pl"
+                  ? "Jesteś brutalnie szczerym analitykiem studenckiego budżetu. Zwracaj insighty wyłącznie w JSON. Wszystkie treści użytkowe, podsumowanie i notatki pisz po polsku. Podsumowanie ma mieć 1-2 krótkie zdania. Absurdalne zakupy mają być zabawne, ale oparte na danych. Kategorie w polu category zostaw jako techniczne wartości z danych, jeśli występują."
+                  : "You are a brutally honest student budget analyst. Return insights in JSON only. Keep summary to 1-2 short sentences. Absurd purchases should be humorous but grounded in the data.",
               },
             ],
           },
@@ -140,8 +148,13 @@ serve(async (req) => {
               role: "user",
               parts: [
                 {
-                  text:
-                    `Month: ${month}. Expense stats: ${inputSummary}. Use only these expenses for your analysis: ${JSON.stringify(expenses)}.`,
+                  text: language === "pl"
+                    ? `Miesiąc: ${month}. Statystyki wydatków: ${inputSummary}. Użyj wyłącznie tych wydatków do analizy i odpowiedz po polsku: ${
+                      JSON.stringify(expenses)
+                    }.`
+                    : `Month: ${month}. Expense stats: ${inputSummary}. Use only these expenses for your analysis: ${
+                      JSON.stringify(expenses)
+                    }.`,
                 },
               ],
             },
@@ -163,7 +176,10 @@ serve(async (req) => {
     const data = await response.json();
     const outputText = extractGeminiText(data);
     if (!outputText) {
-      return json({ error: "Gemini response did not contain text output" }, 500);
+      return json(
+        { error: "Gemini response did not contain text output" },
+        500,
+      );
     }
 
     const insights = JSON.parse(outputText);
@@ -171,13 +187,17 @@ serve(async (req) => {
     await admin.from("insights_monthly").upsert({
       user_id: user.id,
       month: monthStart,
+      language,
       payload_json: insights,
       updated_at: new Date().toISOString(),
-    });
+    }, { onConflict: "user_id,month,language" });
 
-    return json({ cached: false, month, insights });
+    return json({ cached: false, month, language, insights });
   } catch (error) {
-    return json({ error: error instanceof Error ? error.message : `${error}` }, 500);
+    return json(
+      { error: error instanceof Error ? error.message : `${error}` },
+      500,
+    );
   }
 });
 
@@ -200,6 +220,12 @@ function normalizeMonth(value: unknown): string | null {
     return trimmed;
   }
   return null;
+}
+
+function normalizeLanguage(value: unknown): "en" | "pl" {
+  return typeof value === "string" && value.trim().toLowerCase() === "pl"
+    ? "pl"
+    : "en";
 }
 
 function addOneMonth(monthStart: string): string {
@@ -230,12 +256,18 @@ function summarizeExpenses(expenses: Array<Record<string, unknown>>) {
     categories.set(category, (categories.get(category) ?? 0) + amount);
   }
   const topCategory = [...categories.entries()].sort((a, b) => b[1] - a[1])[0];
-  return `Total spend ${total.toFixed(2)} across ${expenses.length} items. Top category: ${topCategory?.[0] ?? "other"}.`;
+  return `Total spend ${
+    total.toFixed(2)
+  } across ${expenses.length} items. Top category: ${
+    topCategory?.[0] ?? "other"
+  }.`;
 }
 
-function buildEmptyInsights() {
+function buildEmptyInsights(language: "en" | "pl") {
   return {
-    summary: "No expenses recorded this month yet.",
+    summary: language === "pl"
+      ? "W tym miesiącu nie zapisano jeszcze żadnych wydatków. Budżet chwilowo nie ma czego komentować."
+      : "No expenses recorded this month yet.",
     absurd_purchases: [],
     category_callouts: [],
   };

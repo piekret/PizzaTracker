@@ -22,7 +22,11 @@ class _CategorySpendingCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Kicker('Variable spending'),
+                    Kicker(
+                      context.text.isPolish
+                          ? 'Wydatki zmienne'
+                          : 'Variable spending',
+                    ),
                     const SizedBox(height: 6),
                     Text(
                       'Spending mix',
@@ -155,7 +159,9 @@ class _CategorySpendingRow extends StatelessWidget {
                   child: LinearProgressIndicator(
                     value: share,
                     minHeight: 8,
-                    backgroundColor: context.palette.border.withValues(alpha: 0.36),
+                    backgroundColor: context.palette.border.withValues(
+                      alpha: 0.36,
+                    ),
                     valueColor: AlwaysStoppedAnimation(color),
                   ),
                 ),

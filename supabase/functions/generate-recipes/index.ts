@@ -2,7 +2,8 @@ import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type",
 };
 
 const recipeSchema = {
@@ -51,11 +52,14 @@ serve(async (req) => {
 
     const payload = await req.json();
     const ingredients = Array.isArray(payload?.ingredients)
-      ? payload.ingredients.map((item: unknown) => `${item}`.trim()).filter(Boolean)
+      ? payload.ingredients.map((item: unknown) => `${item}`.trim()).filter(
+        Boolean,
+      )
       : [];
     const desperationIndex = typeof payload?.desperationIndex === "number"
       ? payload.desperationIndex
       : 0;
+    const language = normalizeLanguage(payload?.language);
 
     if (ingredients.length < 2) {
       return json({ error: "At least two ingredients are required" }, 400);
@@ -64,8 +68,8 @@ serve(async (req) => {
     const response = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/${
         Deno.env.get("GEMINI_RECIPE_MODEL") ??
-        Deno.env.get("GEMINI_MODEL") ??
-        "gemini-1.5-flash"
+          Deno.env.get("GEMINI_MODEL") ??
+          "gemini-1.5-flash"
       }:generateContent?key=${geminiKey}`,
       {
         method: "POST",
@@ -76,8 +80,9 @@ serve(async (req) => {
           systemInstruction: {
             parts: [
               {
-                text:
-                  "You are a student chef with 10 years of dorm-room experience. Produce 3 recipes using ONLY the provided ingredients and common pantry staples like salt, pepper, oil, or water. Keep the tone honest and slightly funny but useful. Return JSON only.",
+                text: language === "pl"
+                  ? "Jesteś studenckim kucharzem z 10-letnim doświadczeniem w kuchni akademikowej. Przygotuj 3 przepisy używając WYŁĄCZNIE podanych składników i podstaw spiżarni takich jak sól, pieprz, olej albo woda. Wszystkie nazwy przepisów, kroki i notatki pisz po polsku. Ton ma być szczery, lekko zabawny, ale użyteczny. Zwróć tylko JSON."
+                  : "You are a student chef with 10 years of dorm-room experience. Produce 3 recipes using ONLY the provided ingredients and common pantry staples like salt, pepper, oil, or water. Keep the tone honest and slightly funny but useful. Return JSON only.",
               },
             ],
           },
@@ -86,8 +91,13 @@ serve(async (req) => {
               role: "user",
               parts: [
                 {
-                  text:
-                    `Ingredients: ${ingredients.join(", ")}. Desperation Index: ${desperationIndex}/100.`,
+                  text: language === "pl"
+                    ? `Składniki: ${
+                      ingredients.join(", ")
+                    }. Indeks Desperacji: ${desperationIndex}/100. Odpowiedz po polsku.`
+                    : `Ingredients: ${
+                      ingredients.join(", ")
+                    }. Desperation Index: ${desperationIndex}/100.`,
                 },
               ],
             },
@@ -109,13 +119,19 @@ serve(async (req) => {
     const data = await response.json();
     const outputText = extractGeminiText(data);
     if (!outputText) {
-      return json({ error: "Gemini response did not contain text output" }, 500);
+      return json(
+        { error: "Gemini response did not contain text output" },
+        500,
+      );
     }
 
     const parsed = JSON.parse(outputText);
     return json({ recipes: normalizeRecipes(parsed.recipes) });
   } catch (error) {
-    return json({ error: error instanceof Error ? error.message : `${error}` }, 500);
+    return json(
+      { error: error instanceof Error ? error.message : `${error}` },
+      500,
+    );
   }
 });
 
@@ -136,7 +152,8 @@ function normalizeRecipes(value: any) {
     .map((recipe) => ({
       name: `${recipe?.name ?? ""}`.trim(),
       ingredients_used: Array.isArray(recipe?.ingredients_used)
-        ? recipe.ingredients_used.map((item: unknown) => `${item}`.trim()).filter(Boolean)
+        ? recipe.ingredients_used.map((item: unknown) => `${item}`.trim())
+          .filter(Boolean)
         : [],
       steps: Array.isArray(recipe?.steps)
         ? recipe.steps.map((item: unknown) => `${item}`.trim()).filter(Boolean)
@@ -144,11 +161,19 @@ function normalizeRecipes(value: any) {
       estimated_cost: typeof recipe?.estimated_cost === "number"
         ? Math.round(recipe.estimated_cost * 100) / 100
         : null,
-      calories: typeof recipe?.calories === "number" ? Math.round(recipe.calories) : null,
+      calories: typeof recipe?.calories === "number"
+        ? Math.round(recipe.calories)
+        : null,
       note: recipe?.note ? `${recipe.note}`.trim() : null,
     }))
     .filter((recipe) => recipe.name.length > 0)
     .slice(0, 3);
+}
+
+function normalizeLanguage(value: unknown): "en" | "pl" {
+  return typeof value === "string" && value.trim().toLowerCase() === "pl"
+    ? "pl"
+    : "en";
 }
 
 function json(body: unknown, status = 200) {

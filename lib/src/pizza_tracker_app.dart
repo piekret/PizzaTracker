@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
@@ -9,6 +10,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'app_chrome.dart';
 import 'app_config.dart';
 import 'app_data.dart';
+import 'app_language.dart';
 import 'app_theme.dart';
 
 part 'auth/auth_gate.dart';
@@ -37,10 +39,19 @@ class PizzaTrackerApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final themePreset = ref.watch(appThemePresetProvider);
+    final language = ref.watch(appLanguageProvider);
+    Intl.defaultLocale = language.code;
 
     return MaterialApp(
       title: 'PizzaTracker',
       debugShowCheckedModeBanner: false,
+      locale: language.locale,
+      supportedLocales: AppLanguage.values.map((language) => language.locale),
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+      ],
       theme: buildAppTheme(themePreset),
       home: const AppRoot(),
     );

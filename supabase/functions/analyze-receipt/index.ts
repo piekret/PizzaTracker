@@ -3,7 +3,8 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.48.1";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type",
 };
 
 const receiptSchema = {
@@ -38,7 +39,8 @@ const receiptSchema = {
     },
     items: {
       type: "ARRAY",
-      description: "Visible receipt line items that should become expense rows.",
+      description:
+        "Visible receipt line items that should become expense rows.",
       items: {
         type: "OBJECT",
         properties: {
@@ -90,17 +92,20 @@ serve(async (req) => {
     }
 
     const admin = createClient(supabaseUrl, serviceRoleKey);
-    const { data: userData, error: userError } = await admin.auth.getUser(token);
+    const { data: userData, error: userError } = await admin.auth.getUser(
+      token,
+    );
     const user = userData.user;
     if (userError || !user) {
       return json({ error: "Invalid authorization token" }, 401);
     }
 
-    const { receiptId, rawText } = await req.json();
+    const { receiptId, rawText, language } = await req.json();
     if (typeof receiptId !== "string" || receiptId.length === 0) {
       return json({ error: "receiptId is required" }, 400);
     }
     const localOcrText = typeof rawText === "string" ? rawText.trim() : "";
+    const languageCode = normalizeLanguage(language);
 
     const { data: receipt, error: receiptError } = await admin
       .from("receipts")
@@ -132,6 +137,7 @@ serve(async (req) => {
       apiKey: geminiKey,
       rawText: localOcrText,
       imageUrl,
+      language: languageCode,
     });
 
     await admin
@@ -147,7 +153,10 @@ serve(async (req) => {
 
     return json(extracted);
   } catch (error) {
-    return json({ error: error instanceof Error ? error.message : `${error}` }, 500);
+    return json(
+      { error: error instanceof Error ? error.message : `${error}` },
+      500,
+    );
   }
 });
 
@@ -155,10 +164,12 @@ async function analyzeWithGemini({
   apiKey,
   rawText,
   imageUrl,
+  language,
 }: {
   apiKey: string;
   rawText: string;
   imageUrl: string | null;
+  language: "en" | "pl";
 }) {
   const model = Deno.env.get("GEMINI_RECEIPT_MODEL") ??
     Deno.env.get("GEMINI_MODEL") ??
@@ -166,10 +177,15 @@ async function analyzeWithGemini({
   const parts: Array<Record<string, unknown>> = [
     {
       text: rawText
-        ? `Categorize this locally extracted receipt OCR text. Prefer real purchasable line items; ignore receipt metadata, payment lines, loyalty messages, taxes, and change due unless they are the only usable amount.\n\nReceipt OCR text:\n${clipText(rawText, 14000)}`
+        ? `Categorize this locally extracted receipt OCR text. Prefer real purchasable line items; ignore receipt metadata, payment lines, loyalty messages, taxes, and change due unless they are the only usable amount.\n\nReceipt OCR text:\n${
+          clipText(rawText, 14000)
+        }`
         : "Extract this receipt into line items and app-ready expense fields.",
     },
   ];
+  const languageInstruction = language === "pl"
+    ? "User-facing description and any inferred app text must be in Polish. Keep store names and visible product names as written on the receipt. Category enum values must remain exactly one of food, alcohol, hygiene, fun, other."
+    : "User-facing description and any inferred app text must be in English. Keep store names and visible product names as written on the receipt. Category enum values must remain exactly one of food, alcohol, hygiene, fun, other.";
   if (imageUrl) {
     parts.push(await imagePartFromUrl(imageUrl));
   }
@@ -186,7 +202,7 @@ async function analyzeWithGemini({
           parts: [
             {
               text:
-                "You extract receipt details for a student budgeting app. Return only fields allowed by the schema. Use the visible grand total, not subtotal. For items, return purchasable line items with prices and categories from food, alcohol, hygiene, fun, other. If line items are unclear, return an empty items array and still provide the best single expense fields.",
+                `You extract receipt details for a student budgeting app. Return only fields allowed by the schema. Use the visible grand total, not subtotal. For items, return purchasable line items with prices and categories from food, alcohol, hygiene, fun, other. If line items are unclear, return an empty items array and still provide the best single expense fields. ${languageInstruction}`,
             },
           ],
         },
@@ -218,6 +234,12 @@ async function analyzeWithGemini({
 
   const parsed = JSON.parse(outputText);
   return normalizeReceipt(parsed, rawText);
+}
+
+function normalizeLanguage(value: unknown): "en" | "pl" {
+  return typeof value === "string" && value.trim().toLowerCase() === "pl"
+    ? "pl"
+    : "en";
 }
 
 function extractGeminiText(payload: any): string | null {
@@ -257,20 +279,23 @@ function bufferToBase64(buffer: Uint8Array): string {
 
 function normalizeReceipt(value: any, fallbackRawText: string) {
   const items = normalizeItems(value.items);
-  const category = normalizeCategory(value.category) ?? dominantCategory(items) ?? "other";
+  const category = normalizeCategory(value.category) ??
+    dominantCategory(items) ?? "other";
   const itemTotal = items.reduce((sum, item) => sum + item.amount, 0);
-  const totalAmount = typeof value.totalAmount === "number" && value.totalAmount > 0
-    ? Math.round(value.totalAmount * 100) / 100
-    : itemTotal > 0
-    ? Math.round(itemTotal * 100) / 100
-    : null;
+  const totalAmount =
+    typeof value.totalAmount === "number" && value.totalAmount > 0
+      ? Math.round(value.totalAmount * 100) / 100
+      : itemTotal > 0
+      ? Math.round(itemTotal * 100) / 100
+      : null;
 
   return {
     storeName: blankToNull(value.storeName),
     totalAmount,
     expenseDate: dateOrNull(value.expenseDate),
     category,
-    description: blankToNull(value.description) ?? blankToNull(value.storeName) ??
+    description: blankToNull(value.description) ??
+      blankToNull(value.storeName) ??
       (items.length === 1 ? items[0].name : "Receipt purchase"),
     rawText: blankToNull(value.rawText) ?? blankToNull(fallbackRawText),
     confidence: clampNumber(value.confidence, 0, 1),
@@ -297,10 +322,14 @@ function normalizeItems(value: unknown) {
 
 function normalizeCategory(value: unknown): string | null {
   if (typeof value !== "string") return null;
-  return ["food", "alcohol", "hygiene", "fun", "other"].includes(value) ? value : null;
+  return ["food", "alcohol", "hygiene", "fun", "other"].includes(value)
+    ? value
+    : null;
 }
 
-function dominantCategory(items: Array<{ category: string; amount: number }>): string | null {
+function dominantCategory(
+  items: Array<{ category: string; amount: number }>,
+): string | null {
   const totals = new Map<string, number>();
   for (const item of items) {
     totals.set(item.category, (totals.get(item.category) ?? 0) + item.amount);

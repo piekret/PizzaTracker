@@ -41,7 +41,7 @@ class StatsScreen extends ConsumerWidget {
                           currency: resolvedCurrency,
                         ),
                         loading: () =>
-                            const _LoadingCard(label: 'Loading summary...'),
+                            _LoadingCard(label: context.text.loadingSummary),
                         error: (error, stackTrace) => _ErrorCard(error: error),
                       ),
                       const SizedBox(height: 14),
@@ -50,8 +50,9 @@ class StatsScreen extends ConsumerWidget {
                           expenses: value,
                           currency: resolvedCurrency,
                         ),
-                        loading: () =>
-                            const _LoadingCard(label: 'Loading daily totals...'),
+                        loading: () => _LoadingCard(
+                          label: context.text.loadingDailyTotals,
+                        ),
                         error: (error, stackTrace) => _ErrorCard(error: error),
                       ),
                       const SizedBox(height: 14),
@@ -60,8 +61,9 @@ class StatsScreen extends ConsumerWidget {
                           spending: value,
                           currency: resolvedCurrency,
                         ),
-                        loading: () =>
-                            const _LoadingCard(label: 'Loading category totals...'),
+                        loading: () => _LoadingCard(
+                          label: context.text.loadingCategoryTotals,
+                        ),
                         error: (error, stackTrace) => _ErrorCard(error: error),
                       ),
                       const SizedBox(height: 14),
@@ -104,7 +106,7 @@ class _StatsHeader extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           _RoundIconButton(
-            tooltip: 'Back',
+            tooltip: context.text.back,
             icon: Icons.arrow_back_rounded,
             onPressed: onBack,
           ),
@@ -113,10 +115,10 @@ class _StatsHeader extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Kicker('Stats snapshot'),
+                Kicker(context.text.statsSnapshot),
                 const SizedBox(height: 4),
                 Text(
-                  'Financial stupidity charts',
+                  context.text.financialCharts,
                   style: Theme.of(context).textTheme.titleLarge,
                 ),
               ],
@@ -145,8 +147,10 @@ class _StatsSummaryCard extends StatelessWidget {
     final spent = summary?.totalSpent ?? 0;
     final receipts = summary?.receiptCount ?? 0;
     final monthLabel = summary == null
-        ? 'This month'
-        : DateFormat.yMMMM().format(summary!.month);
+        ? context.text.thisMonth
+        : DateFormat.yMMMM(
+            context.text.appLanguage.code,
+          ).format(summary!.month);
     final remaining = budget?.remainingBudget;
     final dailyLimit = budget?.dailyLimit;
 
@@ -164,7 +168,7 @@ class _StatsSummaryCard extends StatelessWidget {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Kicker('Monthly pulse'),
+                  Kicker(context.text.monthlyPulse),
                   const SizedBox(height: 6),
                   Text(
                     monthLabel,
@@ -190,7 +194,7 @@ class _StatsSummaryCard extends StatelessWidget {
                   SizedBox(
                     width: tileWidth,
                     child: MetricTile(
-                      label: 'Receipts',
+                      label: context.text.receipts,
                       value: '$receipts',
                       icon: Icons.receipt_long_outlined,
                     ),
@@ -198,7 +202,7 @@ class _StatsSummaryCard extends StatelessWidget {
                   SizedBox(
                     width: tileWidth,
                     child: MetricTile(
-                      label: 'Remaining',
+                      label: context.text.remaining,
                       value: remaining == null
                           ? '—'
                           : formatter.format(remaining),
@@ -208,7 +212,7 @@ class _StatsSummaryCard extends StatelessWidget {
                   SizedBox(
                     width: tileWidth,
                     child: MetricTile(
-                      label: 'Daily limit',
+                      label: context.text.dailyLimit,
                       value: dailyLimit == null
                           ? '—'
                           : formatter.format(dailyLimit),
@@ -253,10 +257,10 @@ class _StatsHeroCard extends ConsumerWidget {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Kicker('Budget story'),
+                  Kicker(context.text.budgetStory),
                   const SizedBox(height: 6),
                   Text(
-                    'This month in one glance',
+                    context.text.thisMonthInOneGlance,
                     style: Theme.of(context).textTheme.titleLarge,
                   ),
                 ],
@@ -282,10 +286,10 @@ class _StatsHeroCard extends ConsumerWidget {
               value: budget == null
                   ? 0
                   : (budget.spentThisPeriod /
-                          (budget.disposableBudget == 0
-                              ? 1
-                              : budget.disposableBudget))
-                      .clamp(0.0, 1.0),
+                            (budget.disposableBudget == 0
+                                ? 1
+                                : budget.disposableBudget))
+                        .clamp(0.0, 1.0),
               minHeight: 8,
               backgroundColor: context.palette.border.withValues(alpha: 0.4),
               valueColor: AlwaysStoppedAnimation(level.color),
@@ -304,7 +308,7 @@ class _StatsHeroCard extends ConsumerWidget {
                   SizedBox(
                     width: tileWidth,
                     child: MetricTile(
-                      label: 'Spent',
+                      label: context.text.spent,
                       value: formatter.format(spent),
                       icon: Icons.receipt_long_outlined,
                     ),
@@ -312,7 +316,7 @@ class _StatsHeroCard extends ConsumerWidget {
                   SizedBox(
                     width: tileWidth,
                     child: MetricTile(
-                      label: 'Remaining',
+                      label: context.text.remaining,
                       value: formatter.format(remaining),
                       icon: Icons.savings_outlined,
                     ),
@@ -320,7 +324,7 @@ class _StatsHeroCard extends ConsumerWidget {
                   SizedBox(
                     width: tileWidth,
                     child: MetricTile(
-                      label: 'Days left',
+                      label: context.text.daysLeft,
                       value: '$daysLeft',
                       icon: Icons.calendar_month_outlined,
                     ),
@@ -334,7 +338,6 @@ class _StatsHeroCard extends ConsumerWidget {
     );
   }
 }
-
 
 class _AbsurdPurchaseRow extends StatelessWidget {
   const _AbsurdPurchaseRow({required this.purchase, required this.amount});
@@ -363,7 +366,10 @@ class _AbsurdPurchaseRow extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(purchase.name, style: Theme.of(context).textTheme.titleSmall),
+              Text(
+                purchase.name,
+                style: Theme.of(context).textTheme.titleSmall,
+              ),
               const SizedBox(height: 2),
               Text(
                 '${_categoryLabel(purchase.category)} - ${DateFormat.yMMMd().format(purchase.date)}',
@@ -464,22 +470,32 @@ class _InsightsActionCardState extends ConsumerState<_InsightsActionCard> {
 
   @override
   Widget build(BuildContext context) {
+    final text = context.text;
     final month = DateFormat('yyyy-MM').format(DateTime.now());
+    final request = InsightsRequest(
+      month: month,
+      languageCode: ref.watch(appLanguageProvider).code,
+    );
+    final activeRequest = _request?.languageCode == request.languageCode
+        ? _request
+        : null;
 
     return FrostPanel(
       padding: const EdgeInsets.all(20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Kicker('AI insights'),
+          Kicker(text.aiInsights),
           const SizedBox(height: 6),
           Text(
-            'Monthly roast',
+            text.isPolish ? 'Miesięczny roast' : 'Monthly roast',
             style: Theme.of(context).textTheme.titleLarge,
           ),
           const SizedBox(height: 8),
           Text(
-            'Generate a brutally honest summary of your spending this month.',
+            text.isPolish
+                ? 'Wygeneruj brutalnie szczere podsumowanie wydatków z tego miesiąca.'
+                : 'Generate a brutally honest summary of your spending this month.',
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
               color: Theme.of(context).colorScheme.onSurfaceVariant,
             ),
@@ -487,28 +503,28 @@ class _InsightsActionCardState extends ConsumerState<_InsightsActionCard> {
           const SizedBox(height: 14),
           FilledButton.icon(
             onPressed: () {
-              setState(() => _request = InsightsRequest(month: month));
+              setState(() => _request = request);
               _forceRefresh = false;
-              ref.invalidate(insightsProvider(InsightsRequest(month: month)));
+              ref.invalidate(insightsProvider(request));
             },
             icon: const Icon(Icons.auto_awesome_outlined),
-            label: const Text('Generate insights'),
+            label: Text(text.generateInsights),
           ),
-          if (_request != null) ...[
+          if (activeRequest != null) ...[
             const SizedBox(height: 8),
             TextButton.icon(
               onPressed: () {
                 setState(() => _forceRefresh = true);
-                ref.invalidate(insightsRefreshProvider(_request!));
+                ref.invalidate(insightsRefreshProvider(activeRequest));
               },
               icon: const Icon(Icons.refresh_rounded),
-              label: const Text('Regenerate'),
+              label: Text(text.isPolish ? 'Wygeneruj ponownie' : 'Regenerate'),
             ),
           ],
-          if (_request != null) ...[
+          if (activeRequest != null) ...[
             const SizedBox(height: 14),
             _InsightsResult(
-              request: _request!,
+              request: activeRequest,
               currency: widget.currency,
               forceRefresh: _forceRefresh,
             ),
@@ -543,18 +559,17 @@ class _InsightsResult extends ConsumerWidget {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              data.summary,
-              style: Theme.of(context).textTheme.bodyMedium,
-            ),
+            Text(data.summary, style: Theme.of(context).textTheme.bodyMedium),
             if (value.cached) ...[
               const SizedBox(height: 6),
-              SoftPill(label: 'Cached result'),
+              SoftPill(label: context.text.cachedResult),
             ],
             if (data.categoryCallouts.isNotEmpty) ...[
               const SizedBox(height: 12),
               Text(
-                'Category callouts',
+                context.text.isPolish
+                    ? 'Komentarze kategorii'
+                    : 'Category callouts',
                 style: Theme.of(context).textTheme.labelLarge,
               ),
               const SizedBox(height: 6),
@@ -570,7 +585,9 @@ class _InsightsResult extends ConsumerWidget {
             if (data.absurdPurchases.isNotEmpty) ...[
               const SizedBox(height: 12),
               Text(
-                'Top 3 absurd purchases',
+                context.text.isPolish
+                    ? 'Top 3 absurdalne zakupy'
+                    : 'Top 3 absurd purchases',
                 style: Theme.of(context).textTheme.labelLarge,
               ),
               const SizedBox(height: 6),
@@ -586,17 +603,14 @@ class _InsightsResult extends ConsumerWidget {
           ],
         );
       },
-      loading: () => const _LoadingCard(label: 'Generating insights...'),
+      loading: () => _LoadingCard(label: context.text.generatingInsights),
       error: (error, stackTrace) => _ErrorCard(error: error),
     );
   }
 }
 
 class _DailySpendingCard extends StatelessWidget {
-  const _DailySpendingCard({
-    required this.expenses,
-    required this.currency,
-  });
+  const _DailySpendingCard({required this.expenses, required this.currency});
 
   final List<ExpenseItem> expenses;
   final String currency;
@@ -609,33 +623,37 @@ class _DailySpendingCard extends StatelessWidget {
     final dailyTotals = _buildDailyTotals(expenses, now);
     final maxValue = dailyTotals.isEmpty
         ? 0.0
-        : dailyTotals.map((entry) => entry.amount).reduce(
-              (a, b) => a > b ? a : b,
-            );
+        : dailyTotals
+              .map((entry) => entry.amount)
+              .reduce((a, b) => a > b ? a : b);
 
     return FrostPanel(
       padding: const EdgeInsets.all(20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Kicker('Daily damage'),
+          Kicker(context.text.isPolish ? 'Dzienne szkody' : 'Daily damage'),
           const SizedBox(height: 6),
           Text(
-            'Daily spending',
+            context.text.isPolish ? 'Dzienne wydatki' : 'Daily spending',
             style: Theme.of(context).textTheme.titleLarge,
           ),
           const SizedBox(height: 6),
           Text(
-            'Last 14 days of spending in the current budget period.',
+            context.text.isPolish
+                ? 'Ostatnie 14 dni wydatków w bieżącym okresie budżetowym.'
+                : 'Last 14 days of spending in the current budget period.',
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
               color: Theme.of(context).colorScheme.onSurfaceVariant,
             ),
           ),
           const SizedBox(height: 16),
           if (dailyTotals.isEmpty)
-            const _ChartEmptyState(
+            _ChartEmptyState(
               icon: Icons.bar_chart_rounded,
-              message: 'No expenses logged for the last two weeks.',
+              message: context.text.isPolish
+                  ? 'Brak wydatków z ostatnich dwóch tygodni.'
+                  : 'No expenses logged for the last two weeks.',
             )
           else
             LayoutBuilder(
@@ -749,10 +767,7 @@ class _DailySpendingCard extends StatelessWidget {
 }
 
 class _CategoryPieCard extends StatelessWidget {
-  const _CategoryPieCard({
-    required this.spending,
-    required this.currency,
-  });
+  const _CategoryPieCard({required this.spending, required this.currency});
 
   final List<CategorySpending> spending;
   final String currency;
@@ -773,10 +788,16 @@ class _CategoryPieCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Kicker('Where it went'),
+                    Kicker(
+                      context.text.isPolish
+                          ? 'Gdzie to poszło'
+                          : 'Where it went',
+                    ),
                     const SizedBox(height: 6),
                     Text(
-                      'Category split',
+                      context.text.isPolish
+                          ? 'Podział kategorii'
+                          : 'Category split',
                       style: Theme.of(context).textTheme.titleLarge,
                     ),
                   ],
@@ -787,9 +808,11 @@ class _CategoryPieCard extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           if (spending.isEmpty)
-            const _ChartEmptyState(
+            _ChartEmptyState(
               icon: Icons.pie_chart_outline,
-              message: 'No category data in this period yet.',
+              message: context.text.isPolish
+                  ? 'Brak danych kategorii w tym okresie.'
+                  : 'No category data in this period yet.',
             )
           else
             LayoutBuilder(
@@ -807,11 +830,12 @@ class _CategoryPieCard extends StatelessWidget {
                           value: item.amount,
                           color: color,
                           radius: 60,
-                          title: total <= 0 ? '0%' : '${(item.amount / total * 100).round()}%',
-                          titleStyle: Theme.of(context)
-                              .textTheme
-                              .labelSmall
-                              ?.copyWith(color: Colors.white),
+                          title: total <= 0
+                              ? '0%'
+                              : '${(item.amount / total * 100).round()}%',
+                          titleStyle: Theme.of(
+                            context,
+                          ).textTheme.labelSmall?.copyWith(color: Colors.white),
                         );
                       }).toList(),
                     ),
@@ -842,11 +866,7 @@ class _CategoryPieCard extends StatelessWidget {
                 }
 
                 return Column(
-                  children: [
-                    chart,
-                    const SizedBox(height: 16),
-                    breakdown,
-                  ],
+                  children: [chart, const SizedBox(height: 16), breakdown],
                 );
               },
             ),
@@ -874,17 +894,11 @@ class _CategorySplitRow extends StatelessWidget {
         Container(
           width: 12,
           height: 12,
-          decoration: BoxDecoration(
-            color: color,
-            shape: BoxShape.circle,
-          ),
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
         ),
         const SizedBox(width: 10),
         Expanded(
-          child: Text(
-            label,
-            style: Theme.of(context).textTheme.bodySmall,
-          ),
+          child: Text(label, style: Theme.of(context).textTheme.bodySmall),
         ),
         Text(
           amount,
@@ -896,7 +910,6 @@ class _CategorySplitRow extends StatelessWidget {
     );
   }
 }
-
 
 class _ChartEmptyState extends StatelessWidget {
   const _ChartEmptyState({required this.icon, required this.message});
@@ -934,8 +947,11 @@ class _ChartEmptyState extends StatelessWidget {
 List<_DailyTotal> _buildDailyTotals(List<ExpenseItem> expenses, DateTime now) {
   final totals = <DateTime, double>{};
   final dateFormat = DateFormat('yyyy-MM-dd');
-  final start = DateTime(now.year, now.month, now.day)
-      .subtract(const Duration(days: 13));
+  final start = DateTime(
+    now.year,
+    now.month,
+    now.day,
+  ).subtract(const Duration(days: 13));
 
   for (final expense in expenses) {
     if (expense.expenseDate.isBefore(start)) {
@@ -947,8 +963,11 @@ List<_DailyTotal> _buildDailyTotals(List<ExpenseItem> expenses, DateTime now) {
 
   final result = <_DailyTotal>[];
   for (var i = 0; i < 14; i++) {
-    final day = DateTime(now.year, now.month, now.day)
-        .subtract(Duration(days: 13 - i));
+    final day = DateTime(
+      now.year,
+      now.month,
+      now.day,
+    ).subtract(Duration(days: 13 - i));
     final key = DateTime.parse(dateFormat.format(day));
     result.add(_DailyTotal(date: key, amount: totals[key] ?? 0));
   }
@@ -956,12 +975,9 @@ List<_DailyTotal> _buildDailyTotals(List<ExpenseItem> expenses, DateTime now) {
   return result;
 }
 
-
 class _DailyTotal {
   const _DailyTotal({required this.date, required this.amount});
 
   final DateTime date;
   final double amount;
 }
-
-

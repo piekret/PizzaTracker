@@ -208,6 +208,10 @@ create trigger on_auth_user_created
   after insert on auth.users
   for each row execute function public.handle_new_user();
 
+drop view if exists public.v_category_monthly_summary;
+drop view if exists public.v_daily_spending;
+drop view if exists public.v_monthly_summary;
+
 create or replace view public.v_monthly_summary
 with (security_invoker = true)
 as

@@ -62,18 +62,24 @@ class _ReceiptImagePreview extends StatelessWidget {
       children: [
         Row(
           children: [
-            const Expanded(
+            Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Kicker('Attached receipt'),
-                  SizedBox(height: 6),
-                  Text('Receipt image'),
+                  Kicker(
+                    context.text.isPolish
+                        ? 'Dołączony paragon'
+                        : 'Attached receipt',
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    context.text.isPolish ? 'Obraz paragonu' : 'Receipt image',
+                  ),
                 ],
               ),
             ),
             IconButton(
-              tooltip: 'Close',
+              tooltip: context.text.isPolish ? 'Zamknij' : 'Close',
               onPressed: () => Navigator.of(context).pop(),
               icon: const Icon(Icons.close_rounded),
             ),

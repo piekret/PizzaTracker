@@ -3,7 +3,9 @@ part of '../pizza_tracker_app.dart';
 String? _validatePositiveAmount(String? value) {
   final amount = double.tryParse((value ?? '').replaceAll(',', '.'));
   if (amount == null || amount <= 0) {
-    return 'Enter an amount above 0.';
+    return AppText(
+      AppLanguage.fromCode(Intl.getCurrentLocale()),
+    ).enterAmountAboveZero;
   }
   return null;
 }
@@ -11,7 +13,9 @@ String? _validatePositiveAmount(String? value) {
 String? _validateMonthDay(String? value) {
   final day = int.tryParse(value ?? '');
   if (day == null || day < 1 || day > 28) {
-    return 'Use a day from 1 to 28.';
+    return AppText(
+      AppLanguage.fromCode(Intl.getCurrentLocale()),
+    ).useDayFrom1To28;
   }
   return null;
 }
@@ -27,54 +31,52 @@ double _responsiveGutter(BuildContext context, {double maxWidth = 860}) {
 ({Color color, String label, String shortLabel, IconData icon}) _levelForIndex(
   int index,
 ) {
+  final text = AppText(AppLanguage.fromCode(Intl.getCurrentLocale()));
+  final level = text.levelText(index);
   if (index <= 20) {
     return (
       color: const Color(0xff22c55e),
-      label: 'All good. Pizza is legally defensible.',
-      shortLabel: 'All good',
+      label: level.label,
+      shortLabel: level.shortLabel,
       icon: Icons.check_circle_outline,
     );
   }
   if (index <= 45) {
     return (
       color: const Color(0xffeab308),
-      label: 'Watch out. Pizza yes, breakfast no.',
-      shortLabel: 'Watch out',
+      label: level.label,
+      shortLabel: level.shortLabel,
       icon: Icons.visibility_outlined,
     );
   }
   if (index <= 70) {
     return (
       color: const Color(0xfff97316),
-      label: 'Economy mode. Cook at home.',
-      shortLabel: 'Economy',
+      label: level.label,
+      shortLabel: level.shortLabel,
       icon: Icons.soup_kitchen_outlined,
     );
   }
   if (index <= 90) {
     return (
       color: const Color(0xffef4444),
-      label: 'SOS. Start counting pasta portions.',
-      shortLabel: 'SOS',
+      label: level.label,
+      shortLabel: level.shortLabel,
       icon: Icons.warning_amber_rounded,
     );
   }
   return (
     color: const Color(0xffa855f7),
-    label: 'Apocalypse. Check the freezer.',
-    shortLabel: 'Apocalypse',
+    label: level.label,
+    shortLabel: level.shortLabel,
     icon: Icons.crisis_alert_outlined,
   );
 }
 
 String _categoryLabel(String category) {
-  return switch (category) {
-    'food' => 'Food',
-    'alcohol' => 'Alcohol',
-    'hygiene' => 'Hygiene',
-    'fun' => 'Fun',
-    _ => 'Other',
-  };
+  return AppText(
+    AppLanguage.fromCode(Intl.getCurrentLocale()),
+  ).categoryLabel(category);
 }
 
 IconData _categoryIcon(String category) {

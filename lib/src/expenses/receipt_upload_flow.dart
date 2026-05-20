@@ -56,7 +56,11 @@ Future<void> showReceiptUploadFlow({
     try {
       analysis = await ref
           .read(appRepositoryProvider)
-          .analyzeReceipt(receipt.id, rawOcrText: rawOcrText);
+          .analyzeReceipt(
+            receipt.id,
+            rawOcrText: rawOcrText,
+            languageCode: ref.read(appLanguageProvider).code,
+          );
     } catch (error) {
       analysisError = error;
     }
@@ -77,9 +81,11 @@ Future<void> showReceiptUploadFlow({
       );
     } else if (ocrError != null && rawOcrText == null) {
       messenger.showSnackBar(
-        const SnackBar(
+        SnackBar(
           content: Text(
-            'Local OCR was unavailable, so receipt analysis used the uploaded image.',
+            context.text.translateKnown(
+              'Local OCR was unavailable, so receipt analysis used the uploaded image.',
+            ),
           ),
         ),
       );
@@ -126,7 +132,9 @@ Future<void> showReceiptUploadFlow({
     }
 
     if (context.mounted) {
-      messenger.showSnackBar(SnackBar(content: Text(error.toString())));
+      messenger.showSnackBar(
+        SnackBar(content: Text(context.text.translateKnown(error.toString()))),
+      );
     }
   }
 }
@@ -172,7 +180,13 @@ ReceiptAnalysis? _fallbackAnalysisFromOcr(String? rawText) {
   return ReceiptAnalysis(
     storeName: storeName,
     totalAmount: totalAmount,
-    description: storeName == null ? 'Receipt purchase' : '$storeName purchase',
+    description: storeName == null
+        ? AppText(
+            AppLanguage.fromCode(Intl.getCurrentLocale()),
+          ).translateKnown('Receipt purchase')
+        : AppLanguage.fromCode(Intl.getCurrentLocale()) == AppLanguage.polish
+        ? 'Zakup: $storeName'
+        : '$storeName purchase',
     category: 'other',
     confidence: 0.35,
   );
@@ -250,7 +264,11 @@ Future<XFile?> _pickReceiptImage({
 String _receiptPickerError(Object error) {
   final message = error.toString();
   if (message.contains('channel-error') || message.contains('ImagePickerApi')) {
-    return 'Receipt picker is unavailable. Fully restart the app, then try again.';
+    return AppText(
+      AppLanguage.fromCode(Intl.getCurrentLocale()),
+    ).translateKnown(
+      'Receipt picker is unavailable. Fully restart the app, then try again.',
+    );
   }
   return message;
 }
@@ -263,14 +281,24 @@ String _receiptAnalysisFallbackMessage(Object error) {
       normalized.contains('rate_limit') ||
       normalized.contains('resource_exhausted') ||
       normalized.contains('429')) {
-    return 'Gemini quota is exhausted. Using local OCR only; check the fields before saving.';
+    return AppText(
+      AppLanguage.fromCode(Intl.getCurrentLocale()),
+    ).translateKnown(
+      'Gemini quota is exhausted. Using local OCR only; check the fields before saving.',
+    );
   }
   if (message.contains('Function not found') ||
       message.contains('not configured') ||
       message.contains('analyze-receipt')) {
-    return 'Receipt uploaded. Manual entry is ready; deploy receipt analysis to enable autofill.';
+    return AppText(
+      AppLanguage.fromCode(Intl.getCurrentLocale()),
+    ).translateKnown(
+      'Receipt uploaded. Manual entry is ready; deploy receipt analysis to enable autofill.',
+    );
   }
-  return 'Receipt uploaded, but automatic reading is unavailable. Fill the expense manually.';
+  return AppText(AppLanguage.fromCode(Intl.getCurrentLocale())).translateKnown(
+    'Receipt uploaded, but automatic reading is unavailable. Fill the expense manually.',
+  );
 }
 
 void _showReceiptUploadingDialog(BuildContext context) {
@@ -288,7 +316,7 @@ void _showReceiptUploadingDialog(BuildContext context) {
             const SizedBox(width: 14),
             Expanded(
               child: Text(
-                'Uploading and reading receipt...',
+                context.text.uploadingReceipt,
                 style: Theme.of(context).textTheme.bodyMedium,
               ),
             ),
@@ -304,20 +332,21 @@ class _ReceiptSourceSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final text = context.text;
     return AppSheetFrame(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const Kicker('Receipt upload'),
+          Kicker(text.receiptUpload),
           const SizedBox(height: 8),
           Text(
-            'Add receipt',
+            text.addReceipt,
             style: Theme.of(context).textTheme.headlineMedium,
           ),
           const SizedBox(height: 8),
           Text(
-            'Runs local OCR first, then uses AI to turn receipt text into expense suggestions.',
+            text.receiptUploadDescription,
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
               color: Theme.of(context).colorScheme.onSurfaceVariant,
             ),
@@ -326,13 +355,13 @@ class _ReceiptSourceSheet extends StatelessWidget {
           FilledButton.icon(
             onPressed: () => Navigator.of(context).pop(ImageSource.camera),
             icon: const Icon(Icons.photo_camera_outlined),
-            label: const Text('Take photo'),
+            label: Text(text.takePhoto),
           ),
           const SizedBox(height: 10),
           OutlinedButton.icon(
             onPressed: () => Navigator.of(context).pop(ImageSource.gallery),
             icon: const Icon(Icons.photo_library_outlined),
-            label: const Text('Choose from gallery'),
+            label: Text(text.chooseFromGallery),
           ),
         ],
       ),

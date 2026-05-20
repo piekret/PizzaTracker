@@ -51,7 +51,7 @@ class _DesperationCard extends StatelessWidget {
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Expanded(child: Kicker('Desperation Index')),
+                      Expanded(child: Kicker(context.text.desperationIndex)),
                       Wrap(
                         spacing: 8,
                         runSpacing: 8,
@@ -63,7 +63,9 @@ class _DesperationCard extends StatelessWidget {
                             color: level.color,
                           ),
                           IconButton.filledTonal(
-                            tooltip: 'Update budget snapshot',
+                            tooltip: context.text.isPolish
+                                ? 'Odśwież budżet'
+                                : 'Update budget snapshot',
                             onPressed: onRefresh,
                             icon: const Icon(Icons.refresh_rounded),
                           ),
@@ -131,7 +133,7 @@ class _DesperationCard extends StatelessWidget {
                           SizedBox(
                             width: tileWidth,
                             child: MetricTile(
-                              label: 'Remaining',
+                              label: context.text.remaining,
                               value: formatter.format(value.remainingBudget),
                               icon: Icons.savings_outlined,
                             ),
@@ -139,7 +141,7 @@ class _DesperationCard extends StatelessWidget {
                           SizedBox(
                             width: tileWidth,
                             child: MetricTile(
-                              label: 'Days left',
+                              label: context.text.daysLeft,
                               value: '${value.daysLeft}',
                               icon: Icons.calendar_month_outlined,
                             ),
@@ -147,7 +149,7 @@ class _DesperationCard extends StatelessWidget {
                           SizedBox(
                             width: tileWidth,
                             child: MetricTile(
-                              label: 'Daily limit',
+                              label: context.text.dailyLimit,
                               value: formatter.format(value.dailyLimit),
                               icon: Icons.local_pizza_outlined,
                             ),
@@ -155,7 +157,7 @@ class _DesperationCard extends StatelessWidget {
                           SizedBox(
                             width: tileWidth,
                             child: MetricTile(
-                              label: 'Spent',
+                              label: context.text.spent,
                               value: formatter.format(value.spentThisPeriod),
                               icon: Icons.receipt_long_outlined,
                             ),

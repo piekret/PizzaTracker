@@ -5,6 +5,7 @@ class SetupScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final text = context.text;
     return Scaffold(
       body: AppBackground(
         child: SafeArea(
@@ -19,17 +20,20 @@ class SetupScreen extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const BrandMark(size: 62),
+                      const Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [BrandMark(size: 62), _LanguageMenu()],
+                      ),
                       const SizedBox(height: 24),
-                      const Kicker('Local config missing'),
+                      Kicker(text.setupKicker),
                       const SizedBox(height: 10),
                       Text(
-                        'PizzaTracker setup',
+                        text.setupTitle,
                         style: Theme.of(context).textTheme.headlineLarge,
                       ),
                       const SizedBox(height: 12),
                       Text(
-                        'Flutter reads client-safe Supabase values from dart-defines first, then the generated assets/env/client.env asset. Keep OpenAI, service-role, Firebase admin, and database secrets in .env only.',
+                        text.setupBody,
                         style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                           color: Theme.of(context).colorScheme.onSurfaceVariant,
                           height: 1.45,
@@ -43,7 +47,7 @@ class SetupScreen extends StatelessWidget {
                       ),
                       const SizedBox(height: 16),
                       Text(
-                        'If this screen stays visible, fill .env with SUPABASE_URL plus SUPABASE_ANON_KEY, run the sync script, then start Flutter again.',
+                        text.setupHint,
                         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                           color: Theme.of(context).colorScheme.onSurfaceVariant,
                         ),

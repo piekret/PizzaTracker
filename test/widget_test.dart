@@ -1,12 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 import 'package:pizza_tracker/src/app_config.dart';
 import 'package:pizza_tracker/src/app_data.dart';
+import 'package:pizza_tracker/src/app_language.dart';
 import 'package:pizza_tracker/src/app_theme.dart';
 import 'package:pizza_tracker/src/pizza_tracker_app.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
+  setUp(() {
+    Intl.defaultLocale = 'en';
+    SharedPreferences.setMockInitialValues({});
+  });
+
   testWidgets('shows setup screen when Supabase config is missing', (
     tester,
   ) async {
@@ -25,6 +33,48 @@ void main() {
       ),
       findsOneWidget,
     );
+  });
+
+  testWidgets('shows Polish setup screen when language is Polish', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          appConfigProvider.overrideWithValue(null),
+          initialAppLanguageProvider.overrideWithValue(AppLanguage.polish),
+        ],
+        child: const PizzaTrackerApp(),
+      ),
+    );
+
+    expect(find.text('Konfiguracja PizzaTracker'), findsOneWidget);
+    expect(find.textContaining('SUPABASE_URL'), findsOneWidget);
+  });
+
+  testWidgets('switches setup screen language from menu', (tester) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [appConfigProvider.overrideWithValue(null)],
+        child: const PizzaTrackerApp(),
+      ),
+    );
+
+    expect(find.text('PizzaTracker setup'), findsOneWidget);
+
+    await tester.tap(find.text('EN'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Polski'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Konfiguracja PizzaTracker'), findsOneWidget);
+
+    await tester.tap(find.text('PL'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('English'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('PizzaTracker setup'), findsOneWidget);
   });
 
   testWidgets('renders dashboard with budget card', (tester) async {

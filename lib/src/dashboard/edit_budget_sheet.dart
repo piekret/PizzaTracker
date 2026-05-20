@@ -74,6 +74,7 @@ class _EditBudgetSheetState extends ConsumerState<EditBudgetSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final text = context.text;
     return AppSheetFrame(
       child: Form(
         key: _formKey,
@@ -81,18 +82,20 @@ class _EditBudgetSheetState extends ConsumerState<EditBudgetSheet> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Kicker('Monthly rules'),
+            Kicker(text.isPolish ? 'Zasady miesiąca' : 'Monthly rules'),
             const SizedBox(height: 8),
             Text(
-              'Budget setup',
+              text.isPolish ? 'Ustawienia budżetu' : 'Budget setup',
               style: Theme.of(context).textTheme.headlineMedium,
             ),
             const SizedBox(height: 16),
             TextFormField(
               controller: _budgetController,
-              decoration: const InputDecoration(
-                labelText: 'Monthly budget',
-                prefixIcon: Icon(Icons.account_balance_wallet_outlined),
+              decoration: InputDecoration(
+                labelText: text.isPolish
+                    ? 'Budżet miesięczny'
+                    : 'Monthly budget',
+                prefixIcon: const Icon(Icons.account_balance_wallet_outlined),
               ),
               keyboardType: const TextInputType.numberWithOptions(
                 decimal: true,
@@ -102,7 +105,9 @@ class _EditBudgetSheetState extends ConsumerState<EditBudgetSheet> {
                   (value ?? '').replaceAll(',', '.'),
                 );
                 if (amount == null || amount < 0) {
-                  return 'Enter a valid budget.';
+                  return text.isPolish
+                      ? 'Podaj poprawny budżet.'
+                      : 'Enter a valid budget.';
                 }
                 return null;
               },
@@ -110,15 +115,17 @@ class _EditBudgetSheetState extends ConsumerState<EditBudgetSheet> {
             const SizedBox(height: 12),
             TextFormField(
               controller: _resetDayController,
-              decoration: const InputDecoration(
-                labelText: 'Budget reset day',
-                prefixIcon: Icon(Icons.event_repeat_outlined),
+              decoration: InputDecoration(
+                labelText: text.isPolish
+                    ? 'Dzień resetu budżetu'
+                    : 'Budget reset day',
+                prefixIcon: const Icon(Icons.event_repeat_outlined),
               ),
               keyboardType: TextInputType.number,
               validator: (value) {
                 final day = int.tryParse(value ?? '');
                 if (day == null || day < 1 || day > 28) {
-                  return 'Use a day from 1 to 28.';
+                  return text.useDayFrom1To28;
                 }
                 return null;
               },
@@ -126,15 +133,17 @@ class _EditBudgetSheetState extends ConsumerState<EditBudgetSheet> {
             const SizedBox(height: 12),
             TextFormField(
               controller: _currencyController,
-              decoration: const InputDecoration(
-                labelText: 'Currency',
-                prefixIcon: Icon(Icons.attach_money_outlined),
+              decoration: InputDecoration(
+                labelText: text.isPolish ? 'Waluta' : 'Currency',
+                prefixIcon: const Icon(Icons.attach_money_outlined),
               ),
               textCapitalization: TextCapitalization.characters,
               validator: (value) {
                 final currency = (value ?? '').trim();
                 if (currency.length < 3 || currency.length > 8) {
-                  return 'Use a currency code like USD or PLN.';
+                  return text.isPolish
+                      ? 'Użyj kodu waluty, np. USD albo PLN.'
+                      : 'Use a currency code like USD or PLN.';
                 }
                 return null;
               },
@@ -151,7 +160,7 @@ class _EditBudgetSheetState extends ConsumerState<EditBudgetSheet> {
                       dimension: 18,
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
-                  : const Text('Save budget'),
+                  : Text(text.isPolish ? 'Zapisz budżet' : 'Save budget'),
             ),
           ],
         ),

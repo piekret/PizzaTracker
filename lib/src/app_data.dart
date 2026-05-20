@@ -82,6 +82,7 @@ final recipeGeneratorProvider =
           .generateRecipes(
             ingredients: request.ingredients,
             desperationIndex: request.desperationIndex,
+            languageCode: request.languageCode,
           );
     });
 
@@ -92,7 +93,10 @@ final insightsProvider =
     ) async {
       return ref
           .watch(appRepositoryProvider)
-          .generateInsights(month: request.month);
+          .generateInsights(
+            month: request.month,
+            languageCode: request.languageCode,
+          );
     });
 
 final insightsRefreshProvider =
@@ -102,7 +106,10 @@ final insightsRefreshProvider =
     ) async {
       return ref
           .watch(appRepositoryProvider)
-          .refreshInsights(month: request.month);
+          .refreshInsights(
+            month: request.month,
+            languageCode: request.languageCode,
+          );
     });
 
 const expenseCategories = ['food', 'alcohol', 'hygiene', 'fun', 'other'];
@@ -575,9 +582,13 @@ class AppRepository {
   Future<ReceiptAnalysis> analyzeReceipt(
     String receiptId, {
     String? rawOcrText,
+    String languageCode = 'en',
   }) async {
     _requireUser();
-    final body = <String, Object?>{'receiptId': receiptId};
+    final body = <String, Object?>{
+      'receiptId': receiptId,
+      'language': _normalizeLanguageCode(languageCode),
+    };
     final trimmedText = rawOcrText?.trim();
     if (trimmedText != null && trimmedText.isNotEmpty) {
       body['rawText'] = trimmedText;
@@ -680,11 +691,16 @@ class AppRepository {
   Future<List<RecipeSuggestion>> generateRecipes({
     required List<String> ingredients,
     required int desperationIndex,
+    String languageCode = 'en',
   }) async {
     _requireUser();
     final response = await _client.functions.invoke(
       'generate-recipes',
-      body: {'ingredients': ingredients, 'desperationIndex': desperationIndex},
+      body: {
+        'ingredients': ingredients,
+        'desperationIndex': desperationIndex,
+        'language': _normalizeLanguageCode(languageCode),
+      },
     );
 
     final map = _responseMap(response.data);
@@ -707,11 +723,14 @@ class AppRepository {
         .toList();
   }
 
-  Future<InsightsResponse> generateInsights({required String month}) async {
+  Future<InsightsResponse> generateInsights({
+    required String month,
+    String languageCode = 'en',
+  }) async {
     _requireUser();
     final response = await _client.functions.invoke(
       'generate-insights',
-      body: {'month': month},
+      body: {'month': month, 'language': _normalizeLanguageCode(languageCode)},
     );
 
     final map = _responseMap(response.data);
@@ -723,11 +742,18 @@ class AppRepository {
     return InsightsResponse.fromMap(map);
   }
 
-  Future<InsightsResponse> refreshInsights({required String month}) async {
+  Future<InsightsResponse> refreshInsights({
+    required String month,
+    String languageCode = 'en',
+  }) async {
     _requireUser();
     final response = await _client.functions.invoke(
       'generate-insights',
-      body: {'month': month, 'force': true},
+      body: {
+        'month': month,
+        'force': true,
+        'language': _normalizeLanguageCode(languageCode),
+      },
     );
 
     final map = _responseMap(response.data);
@@ -1096,22 +1122,25 @@ class RecipeRequest {
   const RecipeRequest({
     required this.ingredients,
     required this.desperationIndex,
+    required this.languageCode,
   });
 
   final List<String> ingredients;
   final int desperationIndex;
+  final String languageCode;
 
   @override
   bool operator ==(Object other) {
     if (identical(this, other)) return true;
     return other is RecipeRequest &&
         other.desperationIndex == desperationIndex &&
+        other.languageCode == languageCode &&
         _listEquals(other.ingredients, ingredients);
   }
 
   @override
   int get hashCode =>
-      Object.hash(desperationIndex, Object.hashAll(ingredients));
+      Object.hash(desperationIndex, languageCode, Object.hashAll(ingredients));
 }
 
 class RecipeSuggestion {
@@ -1153,18 +1182,21 @@ class RecipeSuggestion {
 }
 
 class InsightsRequest {
-  const InsightsRequest({required this.month});
+  const InsightsRequest({required this.month, required this.languageCode});
 
   final String month;
+  final String languageCode;
 
   @override
   bool operator ==(Object other) {
     if (identical(this, other)) return true;
-    return other is InsightsRequest && other.month == month;
+    return other is InsightsRequest &&
+        other.month == month &&
+        other.languageCode == languageCode;
   }
 
   @override
-  int get hashCode => month.hashCode;
+  int get hashCode => Object.hash(month, languageCode);
 }
 
 class InsightsResponse {
@@ -1315,6 +1347,10 @@ String? _blankToNull(Object? value) {
     return null;
   }
   return text;
+}
+
+String _normalizeLanguageCode(String code) {
+  return code.trim().toLowerCase() == 'pl' ? 'pl' : 'en';
 }
 
 String _receiptExtension(String originalName, String? mimeType) {

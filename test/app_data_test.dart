@@ -95,4 +95,28 @@ void main() {
       expect(receipt.analysis?.hasUsefulSuggestion, isTrue);
     });
   });
+
+  group('AI request cache keys', () {
+    test('recipe requests include language', () {
+      const english = RecipeRequest(
+        ingredients: ['pasta', 'eggs'],
+        desperationIndex: 70,
+        languageCode: 'en',
+      );
+      const polish = RecipeRequest(
+        ingredients: ['pasta', 'eggs'],
+        desperationIndex: 70,
+        languageCode: 'pl',
+      );
+
+      expect(english, isNot(polish));
+    });
+
+    test('insight requests include language', () {
+      const english = InsightsRequest(month: '2026-05', languageCode: 'en');
+      const polish = InsightsRequest(month: '2026-05', languageCode: 'pl');
+
+      expect(english, isNot(polish));
+    });
+  });
 }

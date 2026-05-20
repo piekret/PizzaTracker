@@ -27,14 +27,14 @@ class DashboardScreen extends ConsumerWidget {
               onExpenseSaved: () => _refreshExpenseData(ref),
             ),
             icon: const Icon(Icons.document_scanner_outlined),
-            label: const Text('Add receipt'),
+            label: Text(context.text.addReceipt),
           ),
           const SizedBox(height: 10),
           FloatingActionButton.extended(
             heroTag: 'dashboard-add-expense',
             onPressed: () => _showAddExpense(context, ref),
             icon: const Icon(Icons.add_rounded),
-            label: const Text('Add expense'),
+            label: Text(context.text.addExpense),
           ),
         ],
       ),
@@ -71,7 +71,7 @@ class DashboardScreen extends ConsumerWidget {
                     onRefresh: () => _refreshExpenseData(ref),
                   ),
                   loading: () =>
-                      const _LoadingCard(label: 'Calculating desperation...'),
+                      _LoadingCard(label: context.text.calculatingDesperation),
                   error: (error, stackTrace) => _ErrorCard(
                     error: error,
                     hint:
@@ -82,23 +82,29 @@ class DashboardScreen extends ConsumerWidget {
                 profile.when(
                   data: (value) => _BudgetSetupCard(profile: value),
                   loading: () =>
-                      const _LoadingCard(label: 'Loading profile...'),
+                      _LoadingCard(label: context.text.loadingProfile),
                   error: (error, stackTrace) => _ErrorCard(error: error),
                 ),
                 const SizedBox(height: 14),
                 fixedExpenses.when(
                   data: (value) =>
                       _FixedExpensesCard(expenses: value, currency: currency),
-                  loading: () =>
-                      const _LoadingCard(label: 'Loading fixed costs...'),
+                  loading: () => _LoadingCard(
+                    label: context.text.translateKnown(
+                      'Loading fixed costs...',
+                    ),
+                  ),
                   error: (error, stackTrace) => _ErrorCard(error: error),
                 ),
                 const SizedBox(height: 14),
                 incomeEvents.when(
                   data: (value) =>
                       _IncomeEventsCard(events: value, currency: currency),
-                  loading: () =>
-                      const _LoadingCard(label: 'Loading income schedule...'),
+                  loading: () => _LoadingCard(
+                    label: context.text.translateKnown(
+                      'Loading income schedule...',
+                    ),
+                  ),
                   error: (error, stackTrace) => _ErrorCard(error: error),
                 ),
                 const SizedBox(height: 14),
@@ -107,16 +113,22 @@ class DashboardScreen extends ConsumerWidget {
                     spending: value,
                     currency: currency,
                   ),
-                  loading: () =>
-                      const _LoadingCard(label: 'Loading spending mix...'),
+                  loading: () => _LoadingCard(
+                    label: context.text.translateKnown(
+                      'Loading spending mix...',
+                    ),
+                  ),
                   error: (error, stackTrace) => _ErrorCard(error: error),
                 ),
                 const SizedBox(height: 14),
                 expenses.when(
                   data: (value) =>
                       _RecentExpensesCard(expenses: value, currency: currency),
-                  loading: () =>
-                      const _LoadingCard(label: 'Loading recent expenses...'),
+                  loading: () => _LoadingCard(
+                    label: context.text.translateKnown(
+                      'Loading recent expenses...',
+                    ),
+                  ),
                   error: (error, stackTrace) => _ErrorCard(error: error),
                 ),
                 const SizedBox(height: 14),
@@ -209,12 +221,14 @@ class _StatsTeaserCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Financial stupidity charts',
+                  context.text.financialCharts,
                   style: Theme.of(context).textTheme.titleMedium,
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'See the category split and daily damage for this month.',
+                  context.text.isPolish
+                      ? 'Zobacz podział kategorii i dzienne szkody w tym miesiącu.'
+                      : 'See the category split and daily damage for this month.',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
@@ -272,13 +286,17 @@ class _RecipesTeaserCard extends ConsumerWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'What to cook',
+                  context.text.whatToCook,
                   style: Theme.of(context).textTheme.titleMedium,
                 ),
                 const SizedBox(height: 4),
                 Text(
                   isLocked
-                      ? 'Unlocks at desperation 60+. For now, hydrate.'
+                      ? context.text.isPolish
+                            ? 'Odblokuje się przy desperacji 60+. Na razie pij wodę.'
+                            : 'Unlocks at desperation 60+. For now, hydrate.'
+                      : context.text.isPolish
+                      ? 'Użyj tego, co masz. AI utrzyma cię przy życiu.'
                       : 'Use what you have. AI will keep you alive.',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: Theme.of(context).colorScheme.onSurfaceVariant,
@@ -305,6 +323,7 @@ class _DashboardHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final text = context.text;
     return Row(
       children: [
         const BrandMark(size: 50),
@@ -319,7 +338,7 @@ class _DashboardHeader extends StatelessWidget {
               ),
               const SizedBox(height: 2),
               Text(
-                'Budget dashboard',
+                text.isPolish ? 'Panel budżetu' : 'Budget dashboard',
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: Theme.of(context).colorScheme.onSurfaceVariant,
                 ),
@@ -329,8 +348,10 @@ class _DashboardHeader extends StatelessWidget {
         ),
         const _ThemePresetMenu(),
         const SizedBox(width: 8),
+        const _LanguageMenu(),
+        const SizedBox(width: 8),
         _RoundIconButton(
-          tooltip: 'Sign out',
+          tooltip: text.signOut,
           icon: Icons.logout_rounded,
           onPressed: onSignOut,
         ),
@@ -350,6 +371,7 @@ class _DashboardHeroCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final text = context.text;
     final snapshot = ref.watch(budgetSnapshotProvider).asData?.value;
     final currency =
         ref.watch(userProfileProvider).asData?.value.currency ?? 'USD';
@@ -370,10 +392,12 @@ class _DashboardHeroCard extends ConsumerWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Kicker('Can I afford this?'),
+                    Kicker(text.canIAffordThis),
                     const SizedBox(height: 6),
                     Text(
-                      'Track the money before it disappears.',
+                      text.isPolish
+                          ? 'Śledź pieniądze, zanim znikną.'
+                          : 'Track the money before it disappears.',
                       style: Theme.of(context).textTheme.titleLarge,
                     ),
                   ],
@@ -388,19 +412,25 @@ class _DashboardHeroCard extends ConsumerWidget {
             children: [
               if (dailyLimit != null)
                 SoftPill(
-                  label: 'Today: ${formatter.format(dailyLimit)}',
+                  label: text.isPolish
+                      ? 'Dzisiaj: ${formatter.format(dailyLimit)}'
+                      : 'Today: ${formatter.format(dailyLimit)}',
                   icon: Icons.local_pizza_outlined,
                 ),
               if (daysLeft != null)
                 SoftPill(
-                  label: '$daysLeft days left',
+                  label: text.isPolish
+                      ? '$daysLeft dni do końca'
+                      : '$daysLeft days left',
                   icon: Icons.calendar_month_outlined,
                 ),
             ],
           ),
           const SizedBox(height: 12),
           Text(
-            'Snap a receipt or log an expense to keep the Desperation Index honest.',
+            text.isPolish
+                ? 'Zeskanuj paragon albo dodaj wydatek, żeby Indeks Desperacji był uczciwy.'
+                : 'Snap a receipt or log an expense to keep the Desperation Index honest.',
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
               color: Theme.of(context).colorScheme.onSurfaceVariant,
             ),
@@ -413,12 +443,12 @@ class _DashboardHeroCard extends ConsumerWidget {
               FilledButton.icon(
                 onPressed: onScanReceipt,
                 icon: const Icon(Icons.document_scanner_outlined),
-                label: const Text('Scan receipt'),
+                label: Text(text.scanReceipt),
               ),
               OutlinedButton.icon(
                 onPressed: onAddExpense,
                 icon: const Icon(Icons.add_rounded),
-                label: const Text('Add expense'),
+                label: Text(text.addExpense),
               ),
             ],
           ),
@@ -488,9 +518,10 @@ class _ThemePresetMenu extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final selected = ref.watch(appThemePresetProvider);
+    final text = context.text;
 
     return PopupMenuButton<AppThemePreset>(
-      tooltip: 'Theme',
+      tooltip: context.text.theme,
       initialValue: selected,
       onSelected: (preset) {
         ref.read(appThemePresetProvider.notifier).select(preset);
@@ -515,9 +546,9 @@ class _ThemePresetMenu extends ConsumerWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text(preset.label),
+                      Text(_themePresetLabel(preset, text)),
                       Text(
-                        preset.description,
+                        _themePresetDescription(preset, text),
                         style: Theme.of(context).textTheme.bodySmall,
                       ),
                     ],
@@ -545,6 +576,91 @@ class _ThemePresetMenu extends ConsumerWidget {
           border: Border.all(color: context.palette.border),
         ),
         child: const Icon(Icons.palette_outlined, size: 21),
+      ),
+    );
+  }
+
+  String _themePresetLabel(AppThemePreset preset, AppText text) {
+    if (!text.isPolish) {
+      return preset.label;
+    }
+
+    return switch (preset) {
+      AppThemePreset.pizza => 'Księga Margherity',
+      AppThemePreset.midnight => 'Oksfordzki granat',
+      AppThemePreset.matcha => 'Targowa zieleń',
+      AppThemePreset.berry => 'Jagodowy paragon',
+      AppThemePreset.espresso => 'Księga espresso',
+    };
+  }
+
+  String _themePresetDescription(AppThemePreset preset, AppText text) {
+    if (!text.isPolish) {
+      return preset.description;
+    }
+
+    return switch (preset) {
+      AppThemePreset.pizza => 'Ciepłe pomidorowe i papierowe tony',
+      AppThemePreset.midnight => 'Ciemny granat wieczornego rejestru',
+      AppThemePreset.matcha => 'Spokojna zielona paleta notatnika',
+      AppThemePreset.berry => 'Ciemne jagody i archiwum paragonów',
+      AppThemePreset.espresso => 'Kawa, tusz i stare księgi',
+    };
+  }
+}
+
+class _LanguageMenu extends ConsumerWidget {
+  const _LanguageMenu();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final selected = ref.watch(appLanguageProvider);
+
+    return PopupMenuButton<AppLanguage>(
+      tooltip: context.text.language,
+      initialValue: selected,
+      onSelected: (language) {
+        ref.read(appLanguageProvider.notifier).select(language);
+      },
+      itemBuilder: (context) {
+        return AppLanguage.values.map((language) {
+          return PopupMenuItem(
+            value: language,
+            child: Row(
+              children: [
+                SizedBox(
+                  width: 32,
+                  child: Text(
+                    language.shortLabel,
+                    style: const TextStyle(fontWeight: FontWeight.w900),
+                  ),
+                ),
+                Expanded(child: Text(language.label)),
+                if (language == selected)
+                  Icon(
+                    Icons.check_rounded,
+                    size: 18,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+              ],
+            ),
+          );
+        }).toList();
+      },
+      child: Container(
+        width: 44,
+        height: 44,
+        decoration: BoxDecoration(
+          color: context.palette.surface,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: context.palette.border),
+        ),
+        child: Center(
+          child: Text(
+            selected.shortLabel,
+            style: const TextStyle(fontWeight: FontWeight.w900),
+          ),
+        ),
       ),
     );
   }

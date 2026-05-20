@@ -19,10 +19,14 @@ class _RecentExpensesCard extends ConsumerWidget {
               final header = Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Kicker('Latest damage'),
+                  Kicker(
+                    context.text.isPolish
+                        ? 'Najnowsze szkody'
+                        : 'Latest damage',
+                  ),
                   const SizedBox(height: 6),
                   Text(
-                    'Recent expenses',
+                    context.text.recentExpenses,
                     style: Theme.of(context).textTheme.titleLarge,
                   ),
                 ],
@@ -34,20 +38,22 @@ class _RecentExpensesCard extends ConsumerWidget {
                   TextButton.icon(
                     onPressed: () => _showExpenseHistory(context),
                     icon: const Icon(Icons.history_rounded),
-                    label: const Text('View all'),
+                    label: Text(
+                      context.text.isPolish ? 'Zobacz wszystko' : 'View all',
+                    ),
                   ),
-                  SoftPill(label: '${expenses.length} shown'),
+                  SoftPill(
+                    label: context.text.isPolish
+                        ? 'Pokazano: ${expenses.length}'
+                        : '${expenses.length} shown',
+                  ),
                 ],
               );
 
               if (isNarrow) {
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    header,
-                    const SizedBox(height: 12),
-                    actions,
-                  ],
+                  children: [header, const SizedBox(height: 12), actions],
                 );
               }
 
@@ -125,16 +131,16 @@ class _RecentExpensesCard extends ConsumerWidget {
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: const Text('Delete expense?'),
-          content: Text('Remove ${expense.name} from your budget history?'),
+          title: Text(context.text.deleteExpenseQuestion),
+          content: Text(context.text.removeExpenseFromHistory(expense.name)),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('Cancel'),
+              child: Text(context.text.cancel),
             ),
             FilledButton.tonal(
               onPressed: () => Navigator.of(context).pop(true),
-              child: const Text('Delete'),
+              child: Text(context.text.delete),
             ),
           ],
         );
@@ -158,7 +164,9 @@ class _RecentExpensesCard extends ConsumerWidget {
       if (!context.mounted) {
         return;
       }
-      messenger.showSnackBar(SnackBar(content: Text(error.toString())));
+      messenger.showSnackBar(
+        SnackBar(content: Text(context.text.translateKnown(error.toString()))),
+      );
     }
   }
 }
@@ -185,12 +193,14 @@ class _EmptyExpenses extends StatelessWidget {
           ),
           const SizedBox(height: 10),
           Text(
-            'No expenses yet',
+            context.text.noExpensesYet,
             style: Theme.of(context).textTheme.titleMedium,
           ),
           const SizedBox(height: 4),
           Text(
-            'Add one before the pizza place does.',
+            context.text.isPolish
+                ? 'Dodaj coś, zanim zrobi to pizzeria.'
+                : 'Add one before the pizza place does.',
             textAlign: TextAlign.center,
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
               color: Theme.of(context).colorScheme.onSurfaceVariant,
@@ -256,7 +266,7 @@ class _ExpenseRow extends StatelessWidget {
                 ),
                 const SizedBox(height: 3),
                 Text(
-                  '${_categoryLabel(expense.category)} - ${DateFormat.yMMMd().format(expense.expenseDate)}',
+                  '${_categoryLabel(expense.category)} - ${DateFormat.yMMMd(context.text.appLanguage.code).format(expense.expenseDate)}',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
@@ -276,7 +286,9 @@ class _ExpenseRow extends StatelessWidget {
           if (expense.receiptId != null) ...[
             const SizedBox(width: 6),
             IconButton(
-              tooltip: 'Open receipt',
+              tooltip: context.text.isPolish
+                  ? 'Otwórz paragon'
+                  : 'Open receipt',
               onPressed: onOpenReceipt,
               icon: Icon(
                 Icons.image_outlined,
@@ -286,7 +298,9 @@ class _ExpenseRow extends StatelessWidget {
             ),
           ],
           PopupMenuButton<String>(
-            tooltip: 'Expense actions',
+            tooltip: context.text.isPolish
+                ? 'Akcje wydatku'
+                : 'Expense actions',
             onSelected: (value) {
               if (value == 'edit') {
                 onEdit();
@@ -294,19 +308,19 @@ class _ExpenseRow extends StatelessWidget {
               }
               onDelete();
             },
-            itemBuilder: (context) => const [
+            itemBuilder: (context) => [
               PopupMenuItem(
                 value: 'edit',
                 child: ListTile(
-                  leading: Icon(Icons.edit_outlined),
-                  title: Text('Edit'),
+                  leading: const Icon(Icons.edit_outlined),
+                  title: Text(context.text.edit),
                 ),
               ),
               PopupMenuItem(
                 value: 'delete',
                 child: ListTile(
-                  leading: Icon(Icons.delete_outline),
-                  title: Text('Delete'),
+                  leading: const Icon(Icons.delete_outline),
+                  title: Text(context.text.delete),
                 ),
               ),
             ],

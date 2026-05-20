@@ -216,6 +216,7 @@ ThemeData buildAppTheme(AppThemePreset preset) {
     useMaterial3: true,
     brightness: preset.brightness,
     colorScheme: colorScheme,
+    splashFactory: InkRipple.splashFactory,
   );
   final baseText = baseTheme.textTheme;
   final textTheme = baseText

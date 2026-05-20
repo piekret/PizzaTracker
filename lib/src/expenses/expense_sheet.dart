@@ -128,7 +128,11 @@ class _AddExpenseSheetState extends ConsumerState<AddExpenseSheet> {
             ),
             const SizedBox(width: 10),
             Expanded(
-              child: Text(isEdit ? 'Expense updated.' : 'Expense saved.'),
+              child: Text(
+                isEdit
+                    ? context.text.expenseUpdated
+                    : context.text.expenseSaved,
+              ),
             ),
           ],
         ),
@@ -140,6 +144,7 @@ class _AddExpenseSheetState extends ConsumerState<AddExpenseSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final text = context.text;
     return AppSheetFrame(
       child: Form(
         key: _formKey,
@@ -147,28 +152,30 @@ class _AddExpenseSheetState extends ConsumerState<AddExpenseSheet> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Kicker(_hasReceiptAutofill ? 'Receipt autofill' : 'Manual entry'),
+            Kicker(
+              _hasReceiptAutofill ? text.receiptAutofill : text.manualEntry,
+            ),
             const SizedBox(height: 8),
             Text(
               _isEditing
-                  ? 'Edit expense'
+                  ? text.editExpense
                   : _hasReceiptAutofill
-                  ? 'Review extracted expense'
-                  : 'Add expense',
+                  ? text.reviewExtractedExpense
+                  : text.addExpense,
               style: Theme.of(context).textTheme.headlineMedium,
             ),
             const SizedBox(height: 16),
             TextFormField(
               controller: _nameController,
-              decoration: const InputDecoration(
-                labelText: 'Name',
-                prefixIcon: Icon(Icons.shopping_bag_outlined),
+              decoration: InputDecoration(
+                labelText: text.name,
+                prefixIcon: const Icon(Icons.shopping_bag_outlined),
               ),
               textInputAction: TextInputAction.next,
               textCapitalization: TextCapitalization.sentences,
               validator: (value) {
                 if (value == null || value.trim().isEmpty) {
-                  return 'Name is required.';
+                  return text.nameRequired;
                 }
                 return null;
               },
@@ -176,9 +183,9 @@ class _AddExpenseSheetState extends ConsumerState<AddExpenseSheet> {
             const SizedBox(height: 12),
             TextFormField(
               controller: _amountController,
-              decoration: const InputDecoration(
-                labelText: 'Amount',
-                prefixIcon: Icon(Icons.payments_outlined),
+              decoration: InputDecoration(
+                labelText: text.amount,
+                prefixIcon: const Icon(Icons.payments_outlined),
               ),
               keyboardType: const TextInputType.numberWithOptions(
                 decimal: true,
@@ -189,7 +196,7 @@ class _AddExpenseSheetState extends ConsumerState<AddExpenseSheet> {
                   (value ?? '').replaceAll(',', '.'),
                 );
                 if (amount == null || amount <= 0) {
-                  return 'Enter an amount above 0.';
+                  return text.enterAmountAboveZero;
                 }
                 return null;
               },
@@ -197,9 +204,9 @@ class _AddExpenseSheetState extends ConsumerState<AddExpenseSheet> {
             const SizedBox(height: 12),
             DropdownButtonFormField<String>(
               initialValue: _category,
-              decoration: const InputDecoration(
-                labelText: 'Category',
-                prefixIcon: Icon(Icons.category_outlined),
+              decoration: InputDecoration(
+                labelText: text.category,
+                prefixIcon: const Icon(Icons.category_outlined),
               ),
               items: expenseCategories.map((category) {
                 return DropdownMenuItem(
@@ -224,7 +231,9 @@ class _AddExpenseSheetState extends ConsumerState<AddExpenseSheet> {
                 }
               },
               icon: const Icon(Icons.calendar_today_outlined),
-              label: Text(DateFormat.yMMMd().format(_expenseDate)),
+              label: Text(
+                DateFormat.yMMMd(text.appLanguage.code).format(_expenseDate),
+              ),
             ),
             if (_attachedReceiptId != null) ...[
               const SizedBox(height: 12),

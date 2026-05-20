@@ -9,6 +9,7 @@ class _BudgetSetupCard extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final formatter = NumberFormat.simpleCurrency(name: profile.currency);
     final needsSetup = profile.monthlyBudget <= 0;
+    final text = context.text;
 
     return FrostPanel(
       padding: const EdgeInsets.all(18),
@@ -42,14 +43,20 @@ class _BudgetSetupCard extends ConsumerWidget {
               children: [
                 Text(
                   needsSetup
-                      ? 'Budget still needs a number'
-                      : 'Monthly budget locked in',
+                      ? text.isPolish
+                            ? 'Budżet wciąż potrzebuje kwoty'
+                            : 'Budget still needs a number'
+                      : text.monthlyBudgetLockedIn,
                   style: Theme.of(context).textTheme.titleMedium,
                 ),
                 const SizedBox(height: 4),
                 Text(
                   needsSetup
-                      ? 'Set this first so the app can judge your pizza decisions properly.'
+                      ? text.isPolish
+                            ? 'Ustaw to najpierw, żeby aplikacja mogła uczciwie oceniać decyzje pizzowe.'
+                            : 'Set this first so the app can judge your pizza decisions properly.'
+                      : text.isPolish
+                      ? '${formatter.format(profile.monthlyBudget)} resetuje się dnia ${profile.budgetResetDay}.'
                       : '${formatter.format(profile.monthlyBudget)} resets on day ${profile.budgetResetDay}.',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: Theme.of(context).colorScheme.onSurfaceVariant,
@@ -74,7 +81,9 @@ class _BudgetSetupCard extends ConsumerWidget {
                 ref.invalidate(categorySpendingProvider);
               }
             },
-            child: Text(needsSetup ? 'Set' : 'Edit'),
+            child: Text(
+              needsSetup ? (text.isPolish ? 'Ustaw' : 'Set') : text.edit,
+            ),
           ),
         ],
       ),
@@ -91,6 +100,7 @@ class _FixedExpensesCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final formatter = NumberFormat.simpleCurrency(name: currency);
+    final text = context.text;
     final activeTotal = expenses
         .where((expense) => expense.isActive)
         .fold<double>(0, (sum, expense) => sum + expense.amount);
@@ -106,10 +116,12 @@ class _FixedExpensesCard extends ConsumerWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Kicker('Budget planning'),
+                    Kicker(
+                      text.isPolish ? 'Planowanie budżetu' : 'Budget planning',
+                    ),
                     const SizedBox(height: 6),
                     Text(
-                      'Fixed monthly costs',
+                      text.fixedMonthlyCosts,
                       style: Theme.of(context).textTheme.titleLarge,
                     ),
                   ],
@@ -122,10 +134,15 @@ class _FixedExpensesCard extends ConsumerWidget {
           if (expenses.isEmpty)
             _PlanningEmptyState(
               icon: Icons.home_work_outlined,
-              title: 'No fixed costs yet',
-              text:
-                  'Add rent, internet, subscriptions, or anything that hits every month.',
-              actionLabel: 'Add fixed cost',
+              title: text.isPolish
+                  ? 'Brak stałych kosztów'
+                  : 'No fixed costs yet',
+              text: text.isPolish
+                  ? 'Dodaj czynsz, internet, subskrypcje albo cokolwiek, co wpada co miesiąc.'
+                  : 'Add rent, internet, subscriptions, or anything that hits every month.',
+              actionLabel: text.isPolish
+                  ? 'Dodaj stały koszt'
+                  : 'Add fixed cost',
               onPressed: () => _showAddFixedExpense(context, ref),
             )
           else ...[
@@ -133,7 +150,9 @@ class _FixedExpensesCard extends ConsumerWidget {
               _PlanningRow(
                 icon: Icons.receipt_outlined,
                 title: expense.name,
-                subtitle: 'Billed on day ${expense.billingDay}',
+                subtitle: text.isPolish
+                    ? 'Rozliczane dnia ${expense.billingDay}'
+                    : 'Billed on day ${expense.billingDay}',
                 amount: formatter.format(expense.amount),
                 isMuted: !expense.isActive,
                 onDelete: () => _deleteFixedExpense(context, ref, expense),
@@ -144,7 +163,9 @@ class _FixedExpensesCard extends ConsumerWidget {
             OutlinedButton.icon(
               onPressed: () => _showAddFixedExpense(context, ref),
               icon: const Icon(Icons.add_rounded),
-              label: const Text('Add fixed cost'),
+              label: Text(
+                text.isPolish ? 'Dodaj stały koszt' : 'Add fixed cost',
+              ),
             ),
           ],
         ],
@@ -173,13 +194,16 @@ class _FixedExpensesCard extends ConsumerWidget {
     FixedExpense expense,
   ) async {
     final messenger = ScaffoldMessenger.of(context);
+    final text = context.text;
 
     try {
       await ref.read(appRepositoryProvider).deleteFixedExpense(expense.id);
       ref.invalidate(fixedExpensesProvider);
       ref.invalidate(budgetSnapshotProvider);
     } catch (error) {
-      messenger.showSnackBar(SnackBar(content: Text(error.toString())));
+      messenger.showSnackBar(
+        SnackBar(content: Text(text.translateKnown(error.toString()))),
+      );
     }
   }
 }
@@ -193,6 +217,7 @@ class _IncomeEventsCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final formatter = NumberFormat.simpleCurrency(name: currency);
+    final text = context.text;
     final recurringTotal = events
         .where((event) => event.isRecurring)
         .fold<double>(0, (sum, event) => sum + event.amount);
@@ -208,26 +233,33 @@ class _IncomeEventsCard extends ConsumerWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Kicker('Income calendar'),
+                    Kicker(
+                      text.isPolish ? 'Kalendarz wpływów' : 'Income calendar',
+                    ),
                     const SizedBox(height: 6),
                     Text(
-                      'Expected income',
+                      text.expectedIncome,
                       style: Theme.of(context).textTheme.titleLarge,
                     ),
                   ],
                 ),
               ),
-              SoftPill(label: '${formatter.format(recurringTotal)} recurring'),
+              SoftPill(
+                label: text.isPolish
+                    ? '${formatter.format(recurringTotal)} cyklicznie'
+                    : '${formatter.format(recurringTotal)} recurring',
+              ),
             ],
           ),
           const SizedBox(height: 14),
           if (events.isEmpty)
             _PlanningEmptyState(
               icon: Icons.event_available_outlined,
-              title: 'No income dates yet',
-              text:
-                  'Add scholarship, paycheck, or parent transfer days so the calendar makes sense.',
-              actionLabel: 'Add income',
+              title: text.isPolish ? 'Brak dat wpływów' : 'No income dates yet',
+              text: text.isPolish
+                  ? 'Dodaj stypendium, wypłatę albo dzień przelewu od rodziców, żeby kalendarz miał sens.'
+                  : 'Add scholarship, paycheck, or parent transfer days so the calendar makes sense.',
+              actionLabel: text.isPolish ? 'Dodaj wpływ' : 'Add income',
               onPressed: () => _showAddIncomeEvent(context, ref),
             )
           else ...[
@@ -235,8 +267,9 @@ class _IncomeEventsCard extends ConsumerWidget {
               _PlanningRow(
                 icon: Icons.payments_outlined,
                 title: event.name,
-                subtitle:
-                    '${event.isRecurring ? 'Recurring' : 'One-time'} on day ${event.expectedDay}',
+                subtitle: text.isPolish
+                    ? '${event.isRecurring ? 'Cykliczne' : 'Jednorazowe'} dnia ${event.expectedDay}'
+                    : '${event.isRecurring ? 'Recurring' : 'One-time'} on day ${event.expectedDay}',
                 amount: formatter.format(event.amount),
                 onDelete: () => _deleteIncomeEvent(context, ref, event),
               ),
@@ -246,7 +279,7 @@ class _IncomeEventsCard extends ConsumerWidget {
             OutlinedButton.icon(
               onPressed: () => _showAddIncomeEvent(context, ref),
               icon: const Icon(Icons.add_rounded),
-              label: const Text('Add income'),
+              label: Text(text.isPolish ? 'Dodaj wpływ' : 'Add income'),
             ),
           ],
         ],
@@ -274,12 +307,15 @@ class _IncomeEventsCard extends ConsumerWidget {
     IncomeEvent event,
   ) async {
     final messenger = ScaffoldMessenger.of(context);
+    final text = context.text;
 
     try {
       await ref.read(appRepositoryProvider).deleteIncomeEvent(event.id);
       ref.invalidate(incomeEventsProvider);
     } catch (error) {
-      messenger.showSnackBar(SnackBar(content: Text(error.toString())));
+      messenger.showSnackBar(
+        SnackBar(content: Text(text.translateKnown(error.toString()))),
+      );
     }
   }
 }
@@ -378,14 +414,21 @@ class _PlanningRow extends StatelessWidget {
                     color: context.palette.primaryGlow.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(14),
                   ),
-                  child: Icon(icon, color: context.palette.primaryGlow, size: 21),
+                  child: Icon(
+                    icon,
+                    color: context.palette.primaryGlow,
+                    size: 21,
+                  ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(title, style: Theme.of(context).textTheme.titleSmall),
+                      Text(
+                        title,
+                        style: Theme.of(context).textTheme.titleSmall,
+                      ),
                       const SizedBox(height: 3),
                       Text(
                         subtitle,
@@ -421,7 +464,7 @@ class _PlanningRow extends StatelessWidget {
                     ),
                   ),
                 IconButton(
-                  tooltip: 'Delete',
+                  tooltip: context.text.delete,
                   onPressed: onDelete,
                   icon: const Icon(Icons.close_rounded),
                 ),

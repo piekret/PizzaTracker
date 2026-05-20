@@ -112,9 +112,7 @@ class _ReceiptReviewSheetState extends ConsumerState<ReceiptReviewSheet> {
           children: [
             const Icon(Icons.check_rounded, color: Colors.white),
             const SizedBox(width: 10),
-            const Expanded(
-              child: Text('Receipt saved. Desperation Index updated.'),
-            ),
+            Expanded(child: Text(context.text.receiptSavedDesperationUpdated)),
           ],
         ),
         behavior: SnackBarBehavior.floating,
@@ -129,6 +127,7 @@ class _ReceiptReviewSheetState extends ConsumerState<ReceiptReviewSheet> {
         ref.watch(userProfileProvider).asData?.value.currency ?? 'USD';
     final formatter = NumberFormat.simpleCurrency(name: currency);
     final confidence = widget.analysis.confidence;
+    final text = context.text;
     final receiptTotal = widget.analysis.totalAmount;
     final difference = receiptTotal == null
         ? null
@@ -151,22 +150,22 @@ class _ReceiptReviewSheetState extends ConsumerState<ReceiptReviewSheet> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Kicker('Receipt review'),
+                      Kicker(text.receiptReview),
                       const SizedBox(height: 8),
                       Text(
-                        widget.analysis.storeName ?? 'Review receipt items',
+                        widget.analysis.storeName ?? text.reviewReceiptItems,
                         style: Theme.of(context).textTheme.headlineMedium,
                       ),
                     ],
                   ),
                 ),
                 if (confidence != null)
-                  SoftPill(label: '${(confidence * 100).round()}% confidence'),
+                  SoftPill(label: text.confidence((confidence * 100).round())),
               ],
             ),
             const SizedBox(height: 12),
             Text(
-              'Check names, amounts, categories, and date before saving. These will become separate expense rows tied to this receipt.',
+              text.receiptReviewHint,
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                 color: Theme.of(context).colorScheme.onSurfaceVariant,
                 height: 1.35,
@@ -179,7 +178,11 @@ class _ReceiptReviewSheetState extends ConsumerState<ReceiptReviewSheet> {
                   child: OutlinedButton.icon(
                     onPressed: _pickExpenseDate,
                     icon: const Icon(Icons.calendar_today_outlined),
-                    label: Text(DateFormat.yMMMd().format(_expenseDate)),
+                    label: Text(
+                      DateFormat.yMMMd(
+                        text.appLanguage.code,
+                      ).format(_expenseDate),
+                    ),
                   ),
                 ),
                 const SizedBox(width: 10),
@@ -189,7 +192,7 @@ class _ReceiptReviewSheetState extends ConsumerState<ReceiptReviewSheet> {
             if (receiptTotal != null && receiptTotal > 0) ...[
               const SizedBox(height: 8),
               Text(
-                'Receipt total: ${formatter.format(receiptTotal)}',
+                text.receiptTotal(formatter.format(receiptTotal)),
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: Theme.of(context).colorScheme.onSurfaceVariant,
                 ),
@@ -198,8 +201,10 @@ class _ReceiptReviewSheetState extends ConsumerState<ReceiptReviewSheet> {
             if (showMismatch) ...[
               const SizedBox(height: 8),
               _InlineError(
-                message:
-                    'Line items total ${formatter.format(_total)}. Receipt total ${formatter.format(receiptTotal)}.',
+                message: text.lineItemsTotal(
+                  formatter.format(_total),
+                  formatter.format(receiptTotal),
+                ),
               ),
             ],
             const SizedBox(height: 14),
@@ -219,7 +224,7 @@ class _ReceiptReviewSheetState extends ConsumerState<ReceiptReviewSheet> {
             OutlinedButton.icon(
               onPressed: _addItem,
               icon: const Icon(Icons.add_rounded),
-              label: const Text('Add missing item'),
+              label: Text(text.addMissingItem),
             ),
             if (_error != null) ...[
               const SizedBox(height: 12),
@@ -233,11 +238,7 @@ class _ReceiptReviewSheetState extends ConsumerState<ReceiptReviewSheet> {
                       dimension: 18,
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
-                  : Text(
-                      _items.length == 1
-                          ? 'Save 1 expense'
-                          : 'Save ${_items.length} expenses',
-                    ),
+                  : Text(text.saveExpenseCount(_items.length)),
             ),
           ],
         ),
@@ -288,6 +289,7 @@ class _ReceiptItemEditor extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final text = context.text;
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -302,13 +304,13 @@ class _ReceiptItemEditor extends StatelessWidget {
             children: [
               Expanded(
                 child: Text(
-                  'Item ${index + 1}',
+                  text.itemNumber(index),
                   style: Theme.of(context).textTheme.titleSmall,
                 ),
               ),
               if (canRemove)
                 IconButton(
-                  tooltip: 'Remove item',
+                  tooltip: text.removeItem,
                   onPressed: onRemove,
                   icon: const Icon(Icons.close_rounded),
                 ),
@@ -317,15 +319,15 @@ class _ReceiptItemEditor extends StatelessWidget {
           const SizedBox(height: 8),
           TextFormField(
             controller: item.name,
-            decoration: const InputDecoration(
-              labelText: 'Name',
-              prefixIcon: Icon(Icons.shopping_bag_outlined),
+            decoration: InputDecoration(
+              labelText: text.name,
+              prefixIcon: const Icon(Icons.shopping_bag_outlined),
             ),
             textInputAction: TextInputAction.next,
             textCapitalization: TextCapitalization.sentences,
             validator: (value) {
               if (value == null || value.trim().isEmpty) {
-                return 'Name is required.';
+                return text.nameRequired;
               }
               return null;
             },
@@ -336,9 +338,9 @@ class _ReceiptItemEditor extends StatelessWidget {
               final useStackedFields = constraints.maxWidth < 360;
               final amountField = TextFormField(
                 controller: item.amount,
-                decoration: const InputDecoration(
-                  labelText: 'Amount',
-                  prefixIcon: Icon(Icons.payments_outlined),
+                decoration: InputDecoration(
+                  labelText: text.amount,
+                  prefixIcon: const Icon(Icons.payments_outlined),
                 ),
                 keyboardType: const TextInputType.numberWithOptions(
                   decimal: true,
@@ -349,9 +351,9 @@ class _ReceiptItemEditor extends StatelessWidget {
               );
               final categoryField = DropdownButtonFormField<String>(
                 initialValue: item.category,
-                decoration: const InputDecoration(
-                  labelText: 'Category',
-                  prefixIcon: Icon(Icons.category_outlined),
+                decoration: InputDecoration(
+                  labelText: text.category,
+                  prefixIcon: const Icon(Icons.category_outlined),
                 ),
                 items: expenseCategories.map((category) {
                   return DropdownMenuItem(

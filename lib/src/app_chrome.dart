@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'app_language.dart';
 import 'app_theme.dart';
 
 class AppBackground extends StatelessWidget {
@@ -61,10 +62,7 @@ class _CheckerStripePainter extends CustomPainter {
     var i = 0;
     while (x < size.width) {
       if (i.isEven) {
-        canvas.drawRect(
-          Rect.fromLTWH(x, 0, tile, stripeHeight),
-          paintRed,
-        );
+        canvas.drawRect(Rect.fromLTWH(x, 0, tile, stripeHeight), paintRed);
       }
       x += tile;
       i += 1;
@@ -124,11 +122,7 @@ class FrostPanel extends StatelessWidget {
 
     return Material(
       color: Colors.transparent,
-      child: InkWell(
-        borderRadius: borderRadius,
-        onTap: onTap,
-        child: content,
-      ),
+      child: InkWell(borderRadius: borderRadius, onTap: onTap, child: content),
     );
   }
 }
@@ -202,7 +196,7 @@ class Kicker extends StatelessWidget {
         const SizedBox(width: 8),
         Flexible(
           child: Text(
-            '» ${text.toUpperCase()}',
+            '» ${context.text.translateKnown(text).toUpperCase()}',
             style: Theme.of(context).textTheme.labelSmall?.copyWith(
               fontFamily: 'monospace',
               color: palette.border,
@@ -255,7 +249,7 @@ class SoftPill extends StatelessWidget {
             const SizedBox(width: 6),
           ],
           Text(
-            label.toUpperCase(),
+            context.text.translateKnown(label).toUpperCase(),
             overflow: overflow,
             style: Theme.of(context).textTheme.labelSmall?.copyWith(
               fontFamily: 'monospace',
@@ -335,7 +329,12 @@ class MetricTile extends StatelessWidget {
 }
 
 class DashedDivider extends StatelessWidget {
-  const DashedDivider({this.height = 1.4, this.dash = 4, this.gap = 3, super.key});
+  const DashedDivider({
+    this.height = 1.4,
+    this.dash = 4,
+    this.gap = 3,
+    super.key,
+  });
 
   final double height;
   final double dash;

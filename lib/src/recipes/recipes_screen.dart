@@ -33,10 +33,14 @@ class _RecipesScreenState extends ConsumerState<RecipesScreen> {
   Widget build(BuildContext context) {
     final profile = ref.watch(userProfileProvider);
     final budget = ref.watch(budgetSnapshotProvider);
+    final language = ref.watch(appLanguageProvider);
     final currency = profile.asData?.value.currency ?? widget.currency;
     final snapshot = budget.asData?.value;
     final index = snapshot?.desperationIndex ?? 0;
     final isLocked = index < 60;
+    final activeRequest = _lastRequest?.languageCode == language.code
+        ? _lastRequest
+        : null;
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -78,7 +82,7 @@ class _RecipesScreenState extends ConsumerState<RecipesScreen> {
                     _RecipesResultPanel(
                       currency: currency,
                       isLocked: isLocked,
-                      request: _lastRequest,
+                      request: activeRequest,
                     ),
                   ],
                 ),
@@ -119,6 +123,7 @@ class _RecipesScreenState extends ConsumerState<RecipesScreen> {
     final request = RecipeRequest(
       ingredients: List<String>.from(_ingredients),
       desperationIndex: desperationIndex,
+      languageCode: ref.read(appLanguageProvider).code,
     );
     setState(() => _lastRequest = request);
     ref.invalidate(recipeGeneratorProvider(request));
@@ -138,7 +143,7 @@ class _RecipesHeader extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           _RoundIconButton(
-            tooltip: 'Back',
+            tooltip: context.text.back,
             icon: Icons.arrow_back_rounded,
             onPressed: onBack,
           ),
@@ -147,10 +152,10 @@ class _RecipesHeader extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Kicker('Emergency recipes'),
+                Kicker(context.text.emergencyRecipes),
                 const SizedBox(height: 4),
                 Text(
-                  'What to cook',
+                  context.text.whatToCook,
                   style: Theme.of(context).textTheme.titleLarge,
                 ),
               ],
@@ -185,7 +190,7 @@ class _RecipeIntroCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Kicker('Desperation Index'),
+                    Kicker(context.text.desperationIndex),
                     const SizedBox(height: 6),
                     Text(
                       '$desperationIndex / 100',
@@ -195,16 +200,26 @@ class _RecipeIntroCard extends StatelessWidget {
                 ),
               ),
               SoftPill(
-                label: isLocked ? 'Locked' : level.shortLabel,
+                label: isLocked
+                    ? context.text.isPolish
+                          ? 'Zablokowane'
+                          : 'Locked'
+                    : level.shortLabel,
                 icon: isLocked ? Icons.lock_outline : level.icon,
-                color: isLocked ? Theme.of(context).colorScheme.error : level.color,
+                color: isLocked
+                    ? Theme.of(context).colorScheme.error
+                    : level.color,
               ),
             ],
           ),
           const SizedBox(height: 10),
           Text(
             isLocked
-                ? 'Recipes unlock when your budget hits crisis mode (Index 60+).'
+                ? context.text.isPolish
+                      ? 'Przepisy odblokują się, gdy budżet wejdzie w tryb kryzysowy (Indeks 60+).'
+                      : 'Recipes unlock when your budget hits crisis mode (Index 60+).'
+                : context.text.isPolish
+                ? 'Powiedz, co zostało w kuchni. Zrobię z tego coś jadalnego.'
                 : 'Tell me what is left in your kitchen. I will make it edible.',
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
               color: Theme.of(context).colorScheme.onSurfaceVariant,
@@ -242,10 +257,12 @@ class _IngredientInputCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Kicker('Your pantry'),
+          Kicker(context.text.yourPantry),
           const SizedBox(height: 6),
           Text(
-            'What is in your fridge?',
+            context.text.isPolish
+                ? 'Co masz w lodówce?'
+                : 'What is in your fridge?',
             style: Theme.of(context).textTheme.titleLarge,
           ),
           const SizedBox(height: 12),
@@ -255,9 +272,9 @@ class _IngredientInputCard extends StatelessWidget {
                 child: TextField(
                   controller: controller,
                   enabled: !isLocked,
-                  decoration: const InputDecoration(
-                    labelText: 'Add ingredient',
-                    prefixIcon: Icon(Icons.kitchen_outlined),
+                  decoration: InputDecoration(
+                    labelText: context.text.addIngredient,
+                    prefixIcon: const Icon(Icons.kitchen_outlined),
                   ),
                   onSubmitted: (_) => onAdd(),
                 ),
@@ -265,7 +282,7 @@ class _IngredientInputCard extends StatelessWidget {
               const SizedBox(width: 10),
               FilledButton(
                 onPressed: isLocked ? null : onAdd,
-                child: const Text('Add'),
+                child: Text(context.text.add),
               ),
             ],
           ),
@@ -275,7 +292,9 @@ class _IngredientInputCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Add at least 2 ingredients for better results.',
+                  context.text.isPolish
+                      ? 'Dodaj co najmniej 2 składniki dla lepszych wyników.'
+                      : 'Add at least 2 ingredients for better results.',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
@@ -288,7 +307,9 @@ class _IngredientInputCard extends StatelessWidget {
                       .map(
                         (item) => InputChip(
                           label: Text(item),
-                          onPressed: isLocked ? null : () => onAddSuggestion(item),
+                          onPressed: isLocked
+                              ? null
+                              : () => onAddSuggestion(item),
                         ),
                       )
                       .toList(),
@@ -334,8 +355,10 @@ class _GenerateButton extends StatelessWidget {
       icon: const Icon(Icons.auto_awesome_outlined),
       label: Text(
         ingredients.length < 2
-            ? 'Add at least 2 ingredients'
-            : 'Generate recipes',
+            ? context.text.isPolish
+                  ? 'Dodaj co najmniej 2 składniki'
+                  : 'Add at least 2 ingredients'
+            : context.text.generateRecipes,
       ),
     );
   }
@@ -355,16 +378,20 @@ class _RecipesResultPanel extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     if (isLocked) {
-      return const _ChartEmptyState(
+      return _ChartEmptyState(
         icon: Icons.lock_outline,
-        message: 'Recipes unlock once the desperation index hits 60.',
+        message: context.text.isPolish
+            ? 'Przepisy odblokują się, gdy Indeks Desperacji osiągnie 60.'
+            : 'Recipes unlock once the desperation index hits 60.',
       );
     }
 
     if (request == null) {
-      return const _ChartEmptyState(
+      return _ChartEmptyState(
         icon: Icons.restaurant_menu_outlined,
-        message: 'Add ingredients and generate your survival menu.',
+        message: context.text.isPolish
+            ? 'Dodaj składniki i wygeneruj menu przetrwania.'
+            : 'Add ingredients and generate your survival menu.',
       );
     }
 
@@ -374,9 +401,11 @@ class _RecipesResultPanel extends ConsumerWidget {
     return recipes.when(
       data: (value) {
         if (value.isEmpty) {
-          return const _ChartEmptyState(
+          return _ChartEmptyState(
             icon: Icons.restaurant_outlined,
-            message: 'No recipes came back. Try adding more ingredients.',
+            message: context.text.isPolish
+                ? 'Nie wrócił żaden przepis. Spróbuj dodać więcej składników.'
+                : 'No recipes came back. Try adding more ingredients.',
           );
         }
 
@@ -389,7 +418,11 @@ class _RecipesResultPanel extends ConsumerWidget {
           ],
         );
       },
-      loading: () => const _LoadingCard(label: 'Generating recipes...'),
+      loading: () => _LoadingCard(
+        label: context.text.isPolish
+            ? 'Generowanie przepisów...'
+            : 'Generating recipes...',
+      ),
       error: (error, stackTrace) => _ErrorCard(error: error),
     );
   }
@@ -443,7 +476,7 @@ class _RecipeCard extends StatelessWidget {
           ],
           const SizedBox(height: 12),
           Text(
-            'Steps',
+            context.text.isPolish ? 'Kroki' : 'Steps',
             style: Theme.of(context).textTheme.labelLarge,
           ),
           const SizedBox(height: 6),

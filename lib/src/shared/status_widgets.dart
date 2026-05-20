@@ -19,7 +19,7 @@ class _LoadingCard extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 12),
-          Text(label),
+          Text(context.text.translateKnown(label)),
         ],
       ),
     );
@@ -40,16 +40,18 @@ class _ErrorCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           SoftPill(
-            label: 'Something broke',
+            label: context.text.isPolish
+                ? 'Coś się zepsuło'
+                : 'Something broke',
             icon: Icons.error_outline,
             color: Theme.of(context).colorScheme.error,
           ),
           const SizedBox(height: 12),
-          Text(error.toString()),
+          Text(context.text.translateKnown(error.toString())),
           if (hint != null) ...[
             const SizedBox(height: 8),
             Text(
-              hint!,
+              context.text.translateKnown(hint!),
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                 color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
@@ -82,7 +84,7 @@ class _InlineError extends StatelessWidget {
         children: [
           Icon(Icons.error_outline, size: 18, color: error),
           const SizedBox(width: 10),
-          Expanded(child: Text(message)),
+          Expanded(child: Text(context.text.translateKnown(message))),
         ],
       ),
     );

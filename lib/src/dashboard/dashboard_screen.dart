@@ -15,28 +15,52 @@ class DashboardScreen extends ConsumerWidget {
 
     return Scaffold(
       backgroundColor: Colors.transparent,
-      floatingActionButton: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: [
-          FloatingActionButton.extended(
-            heroTag: 'dashboard-add-receipt',
-            onPressed: () => showReceiptUploadFlow(
-              context: context,
-              ref: ref,
-              onExpenseSaved: () => _refreshExpenseData(ref),
-            ),
-            icon: const Icon(Icons.document_scanner_outlined),
-            label: Text(context.text.addReceipt),
-          ),
-          const SizedBox(height: 10),
-          FloatingActionButton.extended(
-            heroTag: 'dashboard-add-expense',
-            onPressed: () => _showAddExpense(context, ref),
-            icon: const Icon(Icons.add_rounded),
-            label: Text(context.text.addExpense),
-          ),
-        ],
+      floatingActionButton: Builder(
+        builder: (context) {
+          final compactActions = MediaQuery.sizeOf(context).width < 360;
+
+          return Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              compactActions
+                  ? FloatingActionButton.small(
+                      heroTag: 'dashboard-add-receipt',
+                      tooltip: context.text.addReceipt,
+                      onPressed: () => showReceiptUploadFlow(
+                        context: context,
+                        ref: ref,
+                        onExpenseSaved: () => _refreshExpenseData(ref),
+                      ),
+                      child: const Icon(Icons.document_scanner_outlined),
+                    )
+                  : FloatingActionButton.extended(
+                      heroTag: 'dashboard-add-receipt',
+                      onPressed: () => showReceiptUploadFlow(
+                        context: context,
+                        ref: ref,
+                        onExpenseSaved: () => _refreshExpenseData(ref),
+                      ),
+                      icon: const Icon(Icons.document_scanner_outlined),
+                      label: Text(context.text.addReceipt),
+                    ),
+              const SizedBox(height: 10),
+              compactActions
+                  ? FloatingActionButton.small(
+                      heroTag: 'dashboard-add-expense',
+                      tooltip: context.text.addExpense,
+                      onPressed: () => _showAddExpense(context, ref),
+                      child: const Icon(Icons.add_rounded),
+                    )
+                  : FloatingActionButton.extended(
+                      heroTag: 'dashboard-add-expense',
+                      onPressed: () => _showAddExpense(context, ref),
+                      icon: const Icon(Icons.add_rounded),
+                      label: Text(context.text.addExpense),
+                    ),
+            ],
+          );
+        },
       ),
       body: AppBackground(
         child: SafeArea(
@@ -324,7 +348,7 @@ class _DashboardHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final text = context.text;
-    return Row(
+    final titleBlock = Row(
       children: [
         const BrandMark(size: 50),
         const SizedBox(width: 14),
@@ -334,11 +358,15 @@ class _DashboardHeader extends StatelessWidget {
             children: [
               Text(
                 'PizzaTracker',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
                 style: Theme.of(context).textTheme.titleLarge,
               ),
               const SizedBox(height: 2),
               Text(
                 text.isPolish ? 'Panel budżetu' : 'Budget dashboard',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: Theme.of(context).colorScheme.onSurfaceVariant,
                 ),
@@ -346,16 +374,44 @@ class _DashboardHeader extends StatelessWidget {
             ],
           ),
         ),
+      ],
+    );
+    final actions = Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      alignment: WrapAlignment.end,
+      children: [
         const _ThemePresetMenu(),
-        const SizedBox(width: 8),
         const _LanguageMenu(),
-        const SizedBox(width: 8),
         _RoundIconButton(
           tooltip: text.signOut,
           icon: Icons.logout_rounded,
           onPressed: onSignOut,
         ),
       ],
+    );
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (constraints.maxWidth < 360) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              titleBlock,
+              const SizedBox(height: 12),
+              Align(alignment: Alignment.centerRight, child: actions),
+            ],
+          );
+        }
+
+        return Row(
+          children: [
+            Expanded(child: titleBlock),
+            const SizedBox(width: 12),
+            actions,
+          ],
+        );
+      },
     );
   }
 }

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
@@ -218,6 +219,106 @@ void main() {
       scrollable: find.byType(Scrollable),
     );
     expect(viewAllFinder, findsOneWidget);
+  });
+
+  testWidgets('dashboard does not overflow at very narrow Polish width', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(260, 760));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          initialAppLanguageProvider.overrideWithValue(AppLanguage.polish),
+          userProfileProvider.overrideWith((ref) async {
+            return const UserProfile(
+              id: 'user-id',
+              displayName: 'Tester',
+              monthlyBudget: 1200,
+              budgetResetDay: 1,
+              currency: 'USD',
+              timezone: 'Europe/Warsaw',
+            );
+          }),
+          budgetSnapshotProvider.overrideWith((ref) async {
+            return const BudgetSnapshot(
+              monthlyBudget: 1200,
+              fixedMonthlyExpenses: 300,
+              disposableBudget: 900,
+              spentThisPeriod: 180,
+              remainingBudget: 720,
+              daysLeft: 18,
+              dailyLimit: 40,
+              desperationIndex: 64,
+            );
+          }),
+          recentExpensesProvider.overrideWith((ref) async {
+            return [
+              ExpenseItem(
+                id: 'expense-id',
+                name: 'Very long narrow screen pizza and groceries entry',
+                amount: 119.99,
+                category: 'food',
+                expenseDate: DateTime(2026, 5, 9),
+                receiptId: 'receipt-id',
+              ),
+            ];
+          }),
+          expenseHistoryProvider.overrideWith((ref) async => const []),
+          categorySpendingProvider.overrideWith((ref) async {
+            return const [
+              CategorySpending(category: 'food', amount: 145, itemCount: 2),
+              CategorySpending(category: 'hygiene', amount: 15, itemCount: 1),
+            ];
+          }),
+          fixedExpensesProvider.overrideWith((ref) async {
+            return const [
+              FixedExpense(
+                id: 'fixed-id',
+                name: 'Very long rent and internet bundle',
+                amount: 500,
+                billingDay: 1,
+                isActive: true,
+              ),
+            ];
+          }),
+          incomeEventsProvider.overrideWith((ref) async {
+            return const [
+              IncomeEvent(
+                id: 'income-id',
+                name: 'Long scholarship transfer name',
+                amount: 900,
+                expectedDay: 5,
+                isRecurring: true,
+              ),
+            ];
+          }),
+        ],
+        child: MaterialApp(
+          locale: const Locale('pl'),
+          supportedLocales: AppLanguage.values.map(
+            (language) => language.locale,
+          ),
+          localizationsDelegates: const [
+            GlobalMaterialLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+          ],
+          theme: buildAppTheme(AppThemePreset.pizza),
+          home: const DashboardScreen(),
+        ),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+
+    for (var i = 0; i < 5; i++) {
+      await tester.drag(find.byType(Scrollable).first, const Offset(0, -500));
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+    }
   });
 
   testWidgets('prefills expense sheet from receipt analysis', (tester) async {

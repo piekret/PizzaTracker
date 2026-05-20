@@ -48,11 +48,9 @@ class _DesperationCard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(child: Kicker(context.text.desperationIndex)),
-                      Wrap(
+                  LayoutBuilder(
+                    builder: (context, constraints) {
+                      final actions = Wrap(
                         spacing: 8,
                         runSpacing: 8,
                         crossAxisAlignment: WrapCrossAlignment.center,
@@ -70,8 +68,35 @@ class _DesperationCard extends StatelessWidget {
                             icon: const Icon(Icons.refresh_rounded),
                           ),
                         ],
-                      ),
-                    ],
+                      );
+
+                      if (constraints.maxWidth < 300) {
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Kicker(
+                              context.text.desperationIndex,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: 10),
+                            actions,
+                          ],
+                        );
+                      }
+
+                      return Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: Kicker(
+                              context.text.desperationIndex,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          actions,
+                        ],
+                      );
+                    },
                   ),
                   const SizedBox(height: 20),
                   Row(

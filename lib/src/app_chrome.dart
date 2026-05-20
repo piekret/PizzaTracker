@@ -248,14 +248,17 @@ class SoftPill extends StatelessWidget {
             Icon(icon, size: 14, color: foreground),
             const SizedBox(width: 6),
           ],
-          Text(
-            context.text.translateKnown(label).toUpperCase(),
-            overflow: overflow,
-            style: Theme.of(context).textTheme.labelSmall?.copyWith(
-              fontFamily: 'monospace',
-              color: foreground,
-              fontWeight: FontWeight.w900,
-              letterSpacing: 1.2,
+          Flexible(
+            child: Text(
+              context.text.translateKnown(label).toUpperCase(),
+              maxLines: 1,
+              overflow: overflow ?? TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                fontFamily: 'monospace',
+                color: foreground,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 1.2,
+              ),
             ),
           ),
         ],
@@ -313,13 +316,17 @@ class MetricTile extends StatelessWidget {
           const SizedBox(height: 6),
           const DashedDivider(),
           const SizedBox(height: 6),
-          Text(
-            value,
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-              fontFamily: 'monospace',
-              fontWeight: FontWeight.w900,
-              letterSpacing: -0.5,
-              fontFeatures: const [FontFeature.tabularFigures()],
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(
+              value,
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                fontFamily: 'monospace',
+                fontWeight: FontWeight.w900,
+                letterSpacing: -0.5,
+                fontFeatures: const [FontFeature.tabularFigures()],
+              ),
             ),
           ),
         ],
@@ -374,15 +381,17 @@ class AppSheetFrame extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final padding = EdgeInsets.only(
-      left: 14,
-      right: 14,
-      top: 14,
-      bottom: MediaQuery.viewInsetsOf(context).bottom + 14,
-    );
-
     return LayoutBuilder(
       builder: (context, constraints) {
+        final compact = constraints.maxWidth < 340;
+        final horizontalPadding = compact ? 8.0 : 14.0;
+        final panelPadding = compact ? 14.0 : 20.0;
+        final padding = EdgeInsets.only(
+          left: horizontalPadding,
+          right: horizontalPadding,
+          top: 10,
+          bottom: MediaQuery.viewInsetsOf(context).bottom + 10,
+        );
         final maxHeight = (constraints.maxHeight - padding.vertical)
             .clamp(0.0, double.infinity)
             .toDouble();
@@ -394,7 +403,7 @@ class AppSheetFrame extends StatelessWidget {
             child: SingleChildScrollView(
               child: FrostPanel(
                 radius: 24,
-                padding: const EdgeInsets.all(20),
+                padding: EdgeInsets.all(panelPadding),
                 child: child,
               ),
             ),

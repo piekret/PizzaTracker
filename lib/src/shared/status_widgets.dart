@@ -19,7 +19,13 @@ class _LoadingCard extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 12),
-          Text(context.text.translateKnown(label)),
+          Expanded(
+            child: Text(
+              context.text.translateKnown(label),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
         ],
       ),
     );

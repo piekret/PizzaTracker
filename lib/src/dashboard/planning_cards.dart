@@ -11,81 +11,103 @@ class _BudgetSetupCard extends ConsumerWidget {
     final needsSetup = profile.monthlyBudget <= 0;
     final text = context.text;
 
+    final icon = Container(
+      width: 48,
+      height: 48,
+      decoration: BoxDecoration(
+        color:
+            (needsSetup
+                    ? context.palette.tertiaryGlow
+                    : context.palette.primaryGlow)
+                .withValues(alpha: 0.14),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: context.palette.border),
+      ),
+      child: Icon(
+        needsSetup
+            ? Icons.priority_high_rounded
+            : Icons.account_balance_wallet_outlined,
+        color: needsSetup
+            ? context.palette.tertiaryGlow
+            : context.palette.primaryGlow,
+      ),
+    );
+    final copy = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          needsSetup
+              ? text.isPolish
+                    ? 'Budżet wciąż potrzebuje kwoty'
+                    : 'Budget still needs a number'
+              : text.monthlyBudgetLockedIn,
+          style: Theme.of(context).textTheme.titleMedium,
+        ),
+        const SizedBox(height: 4),
+        Text(
+          needsSetup
+              ? text.isPolish
+                    ? 'Ustaw to najpierw, żeby aplikacja mogła uczciwie oceniać decyzje pizzowe.'
+                    : 'Set this first so the app can judge your pizza decisions properly.'
+              : text.isPolish
+              ? '${formatter.format(profile.monthlyBudget)} resetuje się dnia ${profile.budgetResetDay}.'
+              : '${formatter.format(profile.monthlyBudget)} resets on day ${profile.budgetResetDay}.',
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
+        ),
+      ],
+    );
+    final action = FilledButton.tonal(
+      onPressed: () async {
+        final saved = await showModalBottomSheet<bool>(
+          context: context,
+          isScrollControlled: true,
+          useSafeArea: true,
+          backgroundColor: Colors.transparent,
+          builder: (context) => EditBudgetSheet(profile: profile),
+        );
+        if (saved == true) {
+          ref.invalidate(userProfileProvider);
+          ref.invalidate(budgetSnapshotProvider);
+          ref.invalidate(categorySpendingProvider);
+        }
+      },
+      child: Text(needsSetup ? (text.isPolish ? 'Ustaw' : 'Set') : text.edit),
+    );
+
     return FrostPanel(
       padding: const EdgeInsets.all(18),
-      child: Row(
-        children: [
-          Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-              color:
-                  (needsSetup
-                          ? context.palette.tertiaryGlow
-                          : context.palette.primaryGlow)
-                      .withValues(alpha: 0.14),
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: context.palette.border),
-            ),
-            child: Icon(
-              needsSetup
-                  ? Icons.priority_high_rounded
-                  : Icons.account_balance_wallet_outlined,
-              color: needsSetup
-                  ? context.palette.tertiaryGlow
-                  : context.palette.primaryGlow,
-            ),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          if (constraints.maxWidth < 360) {
+            return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  needsSetup
-                      ? text.isPolish
-                            ? 'Budżet wciąż potrzebuje kwoty'
-                            : 'Budget still needs a number'
-                      : text.monthlyBudgetLockedIn,
-                  style: Theme.of(context).textTheme.titleMedium,
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    icon,
+                    const SizedBox(width: 14),
+                    Expanded(child: copy),
+                  ],
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  needsSetup
-                      ? text.isPolish
-                            ? 'Ustaw to najpierw, żeby aplikacja mogła uczciwie oceniać decyzje pizzowe.'
-                            : 'Set this first so the app can judge your pizza decisions properly.'
-                      : text.isPolish
-                      ? '${formatter.format(profile.monthlyBudget)} resetuje się dnia ${profile.budgetResetDay}.'
-                      : '${formatter.format(profile.monthlyBudget)} resets on day ${profile.budgetResetDay}.',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
-                ),
+                const SizedBox(height: 12),
+                Align(alignment: Alignment.centerRight, child: action),
               ],
-            ),
-          ),
-          const SizedBox(width: 12),
-          FilledButton.tonal(
-            onPressed: () async {
-              final saved = await showModalBottomSheet<bool>(
-                context: context,
-                isScrollControlled: true,
-                useSafeArea: true,
-                backgroundColor: Colors.transparent,
-                builder: (context) => EditBudgetSheet(profile: profile),
-              );
-              if (saved == true) {
-                ref.invalidate(userProfileProvider);
-                ref.invalidate(budgetSnapshotProvider);
-                ref.invalidate(categorySpendingProvider);
-              }
-            },
-            child: Text(
-              needsSetup ? (text.isPolish ? 'Ustaw' : 'Set') : text.edit,
-            ),
-          ),
-        ],
+            );
+          }
+
+          return Row(
+            children: [
+              icon,
+              const SizedBox(width: 14),
+              Expanded(child: copy),
+              const SizedBox(width: 12),
+              action,
+            ],
+          );
+        },
       ),
     );
   }
@@ -110,25 +132,37 @@ class _FixedExpensesCard extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: Column(
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final title = Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Kicker(
+                    text.isPolish ? 'Planowanie budżetu' : 'Budget planning',
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    text.fixedMonthlyCosts,
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                ],
+              );
+              final pill = SoftPill(label: formatter.format(activeTotal));
+              if (constraints.maxWidth < 320) {
+                return Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Kicker(
-                      text.isPolish ? 'Planowanie budżetu' : 'Budget planning',
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      text.fixedMonthlyCosts,
-                      style: Theme.of(context).textTheme.titleLarge,
-                    ),
-                  ],
-                ),
-              ),
-              SoftPill(label: formatter.format(activeTotal)),
-            ],
+                  children: [title, const SizedBox(height: 10), pill],
+                );
+              }
+              return Row(
+                children: [
+                  Expanded(child: title),
+                  const SizedBox(width: 10),
+                  pill,
+                ],
+              );
+            },
           ),
           const SizedBox(height: 14),
           if (expenses.isEmpty)
@@ -227,29 +261,41 @@ class _IncomeEventsCard extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Kicker(
-                      text.isPolish ? 'Kalendarz wpływów' : 'Income calendar',
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      text.expectedIncome,
-                      style: Theme.of(context).textTheme.titleLarge,
-                    ),
-                  ],
-                ),
-              ),
-              SoftPill(
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final title = Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Kicker(
+                    text.isPolish ? 'Kalendarz wpływów' : 'Income calendar',
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    text.expectedIncome,
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                ],
+              );
+              final pill = SoftPill(
                 label: text.isPolish
                     ? '${formatter.format(recurringTotal)} cyklicznie'
                     : '${formatter.format(recurringTotal)} recurring',
-              ),
-            ],
+              );
+              if (constraints.maxWidth < 320) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [title, const SizedBox(height: 10), pill],
+                );
+              }
+              return Row(
+                children: [
+                  Expanded(child: title),
+                  const SizedBox(width: 10),
+                  pill,
+                ],
+              );
+            },
           ),
           const SizedBox(height: 14),
           if (events.isEmpty)

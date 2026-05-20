@@ -230,6 +230,78 @@ class _ExpenseRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = _categoryColor(expense.category, context);
+    final leading = Container(
+      width: 44,
+      height: 44,
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.14),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Icon(_categoryIcon(expense.category), color: color, size: 22),
+    );
+    final details = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          expense.name,
+          style: Theme.of(context).textTheme.titleSmall,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+        const SizedBox(height: 3),
+        Text(
+          '${_categoryLabel(expense.category)} - ${DateFormat.yMMMd(context.text.appLanguage.code).format(expense.expenseDate)}',
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+      ],
+    );
+    final amountText = Text(
+      amount,
+      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+        fontFeatures: const [FontFeature.tabularFigures()],
+      ),
+    );
+    final receiptButton = expense.receiptId == null
+        ? null
+        : IconButton(
+            tooltip: context.text.isPolish ? 'Otwórz paragon' : 'Open receipt',
+            onPressed: onOpenReceipt,
+            icon: Icon(
+              Icons.image_outlined,
+              size: 19,
+              color: context.palette.primaryGlow,
+            ),
+          );
+    final menuButton = PopupMenuButton<String>(
+      tooltip: context.text.isPolish ? 'Akcje wydatku' : 'Expense actions',
+      onSelected: (value) {
+        if (value == 'edit') {
+          onEdit();
+          return;
+        }
+        onDelete();
+      },
+      itemBuilder: (context) => [
+        PopupMenuItem(
+          value: 'edit',
+          child: ListTile(
+            leading: const Icon(Icons.edit_outlined),
+            title: Text(context.text.edit),
+          ),
+        ),
+        PopupMenuItem(
+          value: 'delete',
+          child: ListTile(
+            leading: const Icon(Icons.delete_outline),
+            title: Text(context.text.delete),
+          ),
+        ),
+      ],
+    );
 
     return Container(
       padding: const EdgeInsets.all(12),
@@ -238,94 +310,48 @@ class _ExpenseRow extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: context.palette.border),
       ),
-      child: Row(
-        children: [
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.14),
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Icon(
-              _categoryIcon(expense.category),
-              color: color,
-              size: 22,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          if (constraints.maxWidth < 330) {
+            return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  expense.name,
-                  style: Theme.of(context).textTheme.titleSmall,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                Row(
+                  children: [
+                    leading,
+                    const SizedBox(width: 12),
+                    Expanded(child: details),
+                    menuButton,
+                  ],
                 ),
-                const SizedBox(height: 3),
-                Text(
-                  '${_categoryLabel(expense.category)} - ${DateFormat.yMMMd(context.text.appLanguage.code).format(expense.expenseDate)}',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(child: amountText),
+                    ?receiptButton,
+                  ],
                 ),
               ],
-            ),
-          ),
-          const SizedBox(width: 12),
-          Text(
-            amount,
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-              fontFeatures: const [FontFeature.tabularFigures()],
-            ),
-          ),
-          if (expense.receiptId != null) ...[
-            const SizedBox(width: 6),
-            IconButton(
-              tooltip: context.text.isPolish
-                  ? 'Otwórz paragon'
-                  : 'Open receipt',
-              onPressed: onOpenReceipt,
-              icon: Icon(
-                Icons.image_outlined,
-                size: 19,
-                color: context.palette.primaryGlow,
+            );
+          }
+
+          return Row(
+            children: [
+              leading,
+              const SizedBox(width: 12),
+              Expanded(child: details),
+              const SizedBox(width: 12),
+              Flexible(
+                child: FittedBox(fit: BoxFit.scaleDown, child: amountText),
               ),
-            ),
-          ],
-          PopupMenuButton<String>(
-            tooltip: context.text.isPolish
-                ? 'Akcje wydatku'
-                : 'Expense actions',
-            onSelected: (value) {
-              if (value == 'edit') {
-                onEdit();
-                return;
-              }
-              onDelete();
-            },
-            itemBuilder: (context) => [
-              PopupMenuItem(
-                value: 'edit',
-                child: ListTile(
-                  leading: const Icon(Icons.edit_outlined),
-                  title: Text(context.text.edit),
-                ),
-              ),
-              PopupMenuItem(
-                value: 'delete',
-                child: ListTile(
-                  leading: const Icon(Icons.delete_outline),
-                  title: Text(context.text.delete),
-                ),
-              ),
+              if (receiptButton != null) ...[
+                const SizedBox(width: 6),
+                receiptButton,
+              ],
+              menuButton,
             ],
-          ),
-        ],
+          );
+        },
       ),
     );
   }

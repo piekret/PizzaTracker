@@ -16,27 +16,41 @@ class _CategorySpendingCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: Column(
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final title = Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Kicker(
+                    context.text.isPolish
+                        ? 'Wydatki zmienne'
+                        : 'Variable spending',
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    context.text.spendingMix,
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                ],
+              );
+              final pill = SoftPill(label: formatter.format(total));
+
+              if (constraints.maxWidth < 320) {
+                return Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Kicker(
-                      context.text.isPolish
-                          ? 'Wydatki zmienne'
-                          : 'Variable spending',
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      'Spending mix',
-                      style: Theme.of(context).textTheme.titleLarge,
-                    ),
-                  ],
-                ),
-              ),
-              SoftPill(label: formatter.format(total)),
-            ],
+                  children: [title, const SizedBox(height: 10), pill],
+                );
+              }
+
+              return Row(
+                children: [
+                  Expanded(child: title),
+                  const SizedBox(width: 10),
+                  pill,
+                ],
+              );
+            },
           ),
           const SizedBox(height: 14),
           if (spending.isEmpty)
@@ -145,10 +159,18 @@ class _CategorySpendingRow extends StatelessWidget {
                         style: Theme.of(context).textTheme.titleSmall,
                       ),
                     ),
-                    Text(
-                      amount,
-                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                        fontFeatures: const [FontFeature.tabularFigures()],
+                    Flexible(
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
+                          amount,
+                          style: Theme.of(context).textTheme.titleSmall
+                              ?.copyWith(
+                                fontFeatures: const [
+                                  FontFeature.tabularFigures(),
+                                ],
+                              ),
+                        ),
                       ),
                     ),
                   ],

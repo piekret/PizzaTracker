@@ -57,7 +57,9 @@ class _CategorySpendingCard extends StatelessWidget {
             const _CategorySpendingEmpty()
           else ...[
             Text(
-              'Current budget period by category.',
+              context.text.isPolish
+                  ? 'Bieżący okres budżetowy według kategorii.'
+                  : 'Current budget period by category.',
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                 color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
@@ -97,7 +99,9 @@ class _CategorySpendingEmpty extends StatelessWidget {
           const SizedBox(width: 12),
           Expanded(
             child: Text(
-              'No variable spending in this budget period yet.',
+              context.text.isPolish
+                  ? 'Kategorie pojawią się po pierwszym wydatku w tym okresie.'
+                  : 'Categories will appear after the first expense in this period.',
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                 color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
@@ -124,7 +128,11 @@ class _CategorySpendingRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final color = _categoryColor(spending.category, context);
     final share = total <= 0 ? 0.0 : (spending.amount / total).clamp(0.0, 1.0);
-    final itemLabel = spending.itemCount == 1
+    final itemLabel = context.text.isPolish
+        ? spending.itemCount == 1
+              ? '1 wpis'
+              : '${spending.itemCount} wpisy'
+        : spending.itemCount == 1
         ? '1 item'
         : '${spending.itemCount} items';
 
@@ -189,7 +197,9 @@ class _CategorySpendingRow extends StatelessWidget {
                 ),
                 const SizedBox(height: 5),
                 Text(
-                  '${(share * 100).round()}% of variable spending - $itemLabel',
+                  context.text.isPolish
+                      ? '${(share * 100).round()}% wydatków zmiennych - $itemLabel'
+                      : '${(share * 100).round()}% of variable spending - $itemLabel',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),

@@ -20,9 +20,7 @@ class _RecentExpensesCard extends ConsumerWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Kicker(
-                    context.text.isPolish
-                        ? 'Najnowsze szkody'
-                        : 'Latest damage',
+                    context.text.isPolish ? 'Ostatnie wpisy' : 'Latest entries',
                   ),
                   const SizedBox(height: 6),
                   Text(
@@ -199,8 +197,8 @@ class _EmptyExpenses extends StatelessWidget {
           const SizedBox(height: 4),
           Text(
             context.text.isPolish
-                ? 'Dodaj coś, zanim zrobi to pizzeria.'
-                : 'Add one before the pizza place does.',
+                ? 'Dodaj paragon albo ręczny wydatek, żeby historia zaczęła mieć sens.'
+                : 'Add a receipt or manual expense to start building your history.',
             textAlign: TextAlign.center,
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
               color: Theme.of(context).colorScheme.onSurfaceVariant,

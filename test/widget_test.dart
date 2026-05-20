@@ -264,8 +264,8 @@ void main() {
 
     await tester.pumpAndSettle();
 
-    expect(find.text('Budget ready. Now add the first trace.'), findsOneWidget);
-    expect(find.text('Add first receipt'), findsOneWidget);
+    expect(find.text('Budget ready. Add your first expense.'), findsOneWidget);
+    expect(find.text('Scan first receipt'), findsOneWidget);
     expect(find.text('Add fixed cost'), findsWidgets);
     expect(tester.takeException(), isNull);
   });

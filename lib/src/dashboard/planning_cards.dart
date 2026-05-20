@@ -172,8 +172,8 @@ class _FixedExpensesCard extends ConsumerWidget {
                   ? 'Brak stałych kosztów'
                   : 'No fixed costs yet',
               text: text.isPolish
-                  ? 'Dodaj czynsz, internet, subskrypcje albo cokolwiek, co wpada co miesiąc.'
-                  : 'Add rent, internet, subscriptions, or anything that hits every month.',
+                  ? 'Dodaj koszty, które wracają co miesiąc, żeby dzienny limit był dokładniejszy.'
+                  : 'Add monthly recurring costs so the daily limit is more accurate.',
               actionLabel: text.isPolish
                   ? 'Dodaj stały koszt'
                   : 'Add fixed cost',
@@ -301,10 +301,10 @@ class _IncomeEventsCard extends ConsumerWidget {
           if (events.isEmpty)
             _PlanningEmptyState(
               icon: Icons.event_available_outlined,
-              title: text.isPolish ? 'Brak dat wpływów' : 'No income dates yet',
+              title: text.isPolish ? 'Brak wpływów' : 'No income yet',
               text: text.isPolish
-                  ? 'Dodaj stypendium, wypłatę albo dzień przelewu od rodziców, żeby kalendarz miał sens.'
-                  : 'Add scholarship, paycheck, or parent transfer days so the calendar makes sense.',
+                  ? 'Dodaj wypłatę, stypendium albo inny regularny wpływ, żeby plan miesiąca był pełniejszy.'
+                  : 'Add a paycheck, scholarship, or other regular income to complete the monthly plan.',
               actionLabel: text.isPolish ? 'Dodaj wpływ' : 'Add income',
               onPressed: () => _showAddIncomeEvent(context, ref),
             )

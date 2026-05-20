@@ -345,8 +345,8 @@ const _plKnown = <String, String>{
       'Sprawdź, czy RPC get_budget_snapshot istnieje w Supabase.',
   'Can I afford this?': 'Czy mnie na to stać?',
   'Financial stupidity charts': 'Wykresy finansowych głupot',
-  'See the category split and daily damage for this month.':
-      'Zobacz podział kategorii i dzienne szkody w tym miesiącu.',
+  'See categories, spending pace, and the days that hit hardest.':
+      'Zobacz kategorie, tempo wydatków i dni, które najbardziej bolały.',
   'Emergency recipes': 'Awaryjne przepisy',
   'Unlock recipes when the budget starts looking grim.':
       'Odblokuj przepisy, kiedy budżet zaczyna wyglądać ponuro.',

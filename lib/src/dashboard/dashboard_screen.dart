@@ -283,15 +283,15 @@ class _FirstRunNextStepCard extends StatelessWidget {
               const SizedBox(height: 6),
               Text(
                 text.isPolish
-                    ? 'Budżet gotowy. Teraz dodaj pierwszy ślad.'
-                    : 'Budget ready. Now add the first trace.',
+                    ? 'Budżet gotowy. Dodaj pierwszy wydatek.'
+                    : 'Budget ready. Add your first expense.',
                 style: Theme.of(context).textTheme.titleLarge,
               ),
               const SizedBox(height: 6),
               Text(
                 text.isPolish
-                    ? 'Pierwszy paragon albo ręczny wydatek odblokuje realny dzienny limit, kategorie i sensowne podpowiedzi AI.'
-                    : 'A first receipt or manual expense unlocks the real daily limit, categories, and useful AI insights.',
+                    ? 'Po pierwszym wpisie dzienny limit, kategorie i podpowiedzi zaczną pokazywać realny obraz miesiąca.'
+                    : 'After the first entry, the daily limit, categories, and insights start reflecting the real month.',
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: Theme.of(context).colorScheme.onSurfaceVariant,
                   height: 1.35,
@@ -307,8 +307,8 @@ class _FirstRunNextStepCard extends StatelessWidget {
                     icon: const Icon(Icons.document_scanner_outlined),
                     label: Text(
                       text.isPolish
-                          ? 'Dodaj pierwszy paragon'
-                          : 'Add first receipt',
+                          ? 'Skanuj pierwszy paragon'
+                          : 'Scan first receipt',
                     ),
                   ),
                   OutlinedButton.icon(
@@ -386,8 +386,8 @@ class _StatsTeaserCard extends StatelessWidget {
                 const SizedBox(height: 4),
                 Text(
                   context.text.isPolish
-                      ? 'Zobacz podział kategorii i dzienne szkody w tym miesiącu.'
-                      : 'See the category split and daily damage for this month.',
+                      ? 'Zobacz kategorie, tempo wydatków i dni, które najbardziej bolały.'
+                      : 'See categories, spending pace, and the days that hit hardest.',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
@@ -452,11 +452,11 @@ class _RecipesTeaserCard extends ConsumerWidget {
                 Text(
                   isLocked
                       ? context.text.isPolish
-                            ? 'Odblokuje się przy desperacji 60+. Na razie pij wodę.'
-                            : 'Unlocks at desperation 60+. For now, hydrate.'
+                            ? 'Odblokuje się przy Indeksie Desperacji 60+.'
+                            : 'Unlocks when the Desperation Index reaches 60+.'
                       : context.text.isPolish
-                      ? 'Użyj tego, co masz. AI utrzyma cię przy życiu.'
-                      : 'Use what you have. AI will keep you alive.',
+                      ? 'Zrób tani posiłek z tego, co już masz.'
+                      : 'Make a cheap meal from what you already have.',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
@@ -620,8 +620,8 @@ class _DashboardHeroCard extends ConsumerWidget {
           const SizedBox(height: 12),
           Text(
             text.isPolish
-                ? 'Zeskanuj paragon albo dodaj wydatek, żeby Indeks Desperacji był uczciwy.'
-                : 'Snap a receipt or log an expense to keep the Desperation Index honest.',
+                ? 'Aktualizuj wydatki, żeby dzienny limit i Indeks Desperacji były wiarygodne.'
+                : 'Keep expenses updated so the daily limit and Desperation Index stay accurate.',
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
               color: Theme.of(context).colorScheme.onSurfaceVariant,
             ),

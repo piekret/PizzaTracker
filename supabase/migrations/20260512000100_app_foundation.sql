@@ -292,6 +292,7 @@ declare
   v_ideal_daily numeric(10,2);
   v_expected_remaining numeric;
   v_daily_pressure numeric;
+  v_spent_pressure numeric;
   v_schedule_pressure numeric;
   v_over_budget_pressure numeric;
   v_desperation integer;
@@ -350,10 +351,16 @@ begin
   v_expected_remaining := v_ideal_daily * greatest(v_days_left, 1);
 
   v_daily_pressure := 0;
+  v_spent_pressure := 0;
   v_schedule_pressure := 0;
   v_over_budget_pressure := 0;
 
   if v_disposable_budget > 0 and v_ideal_daily > 0 then
+    v_spent_pressure := greatest(
+      least((v_spent_this_period / v_disposable_budget), 1),
+      0
+    );
+
     v_daily_pressure := greatest(
       least(((v_ideal_daily - v_daily_limit) / v_ideal_daily), 1),
       0
@@ -373,8 +380,9 @@ begin
       least(
         100,
         round(
-          (v_daily_pressure * 30) +
-          (v_schedule_pressure * 60) +
+          (v_spent_pressure * 45) +
+          (v_schedule_pressure * 35) +
+          (v_daily_pressure * 20) +
           (v_over_budget_pressure * 70)
         )::int
       )

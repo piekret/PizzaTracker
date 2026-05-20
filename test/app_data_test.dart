@@ -125,6 +125,47 @@ void main() {
     });
   });
 
+  group('calculateDesperationIndex', () {
+    test('stays zero before any spending', () {
+      final index = calculateDesperationIndex(
+        disposableBudget: 1000,
+        spentThisPeriod: 0,
+        remainingBudget: 1000,
+        dailyLimit: 50,
+        idealDaily: 33.33,
+        daysLeft: 20,
+      );
+
+      expect(index, 0);
+    });
+
+    test('reflects used budget even when spending is not over schedule', () {
+      final index = calculateDesperationIndex(
+        disposableBudget: 1000,
+        spentThisPeriod: 500,
+        remainingBudget: 500,
+        dailyLimit: 33.33,
+        idealDaily: 33.33,
+        daysLeft: 15,
+      );
+
+      expect(index, 23);
+    });
+
+    test('rises when spending is ahead of schedule', () {
+      final index = calculateDesperationIndex(
+        disposableBudget: 1000,
+        spentThisPeriod: 800,
+        remainingBudget: 200,
+        dailyLimit: 13.33,
+        idealDaily: 33.33,
+        daysLeft: 15,
+      );
+
+      expect(index, greaterThan(50));
+    });
+  });
+
   group('AI request cache keys', () {
     test('recipe requests include language', () {
       const english = RecipeRequest(

@@ -117,6 +117,40 @@ const receiptImagesBucket = 'receipt-images';
 const _receiptSelectColumns =
     'id, store_name, total_amount, raw_ocr_text, analysis_json, image_path, scanned_at';
 
+int calculateDesperationIndex({
+  required double disposableBudget,
+  required double spentThisPeriod,
+  required double remainingBudget,
+  required double dailyLimit,
+  required double idealDaily,
+  required int daysLeft,
+}) {
+  if (disposableBudget <= 0) {
+    return remainingBudget < 0 ? 100 : 0;
+  }
+
+  final spentPressure = (spentThisPeriod / disposableBudget).clamp(0.0, 1.0);
+  final dailyPressure = idealDaily > 0
+      ? ((idealDaily - dailyLimit) / idealDaily).clamp(0.0, 1.0)
+      : 0.0;
+  final expectedRemaining = idealDaily * daysLeft.clamp(1, 1000);
+  final schedulePressure =
+      ((expectedRemaining - remainingBudget) / disposableBudget).clamp(
+        0.0,
+        1.0,
+      );
+  final overBudgetPressure = remainingBudget < 0
+      ? ((-remainingBudget) / disposableBudget).clamp(0.0, 1.0)
+      : 0.0;
+
+  return ((spentPressure * 45) +
+          (schedulePressure * 35) +
+          (dailyPressure * 20) +
+          (overBudgetPressure * 70))
+      .round()
+      .clamp(0, 100);
+}
+
 class AppRepository {
   AppRepository(this._client);
 
@@ -212,31 +246,6 @@ class AppRepository {
     final dailyLimit = remainingBudget / daysLeft.clamp(1, 1000);
     final idealDaily = disposableBudget / totalDays.clamp(1, 1000);
 
-    var desperation = 0;
-    if (disposableBudget > 0 && idealDaily > 0) {
-      final dailyPressure = ((idealDaily - dailyLimit) / idealDaily).clamp(
-        0.0,
-        1.0,
-      );
-      final expectedRemaining = idealDaily * daysLeft.clamp(1, 1000);
-      final schedulePressure =
-          ((expectedRemaining - remainingBudget) / disposableBudget).clamp(
-            0.0,
-            1.0,
-          );
-      final overBudgetPressure = remainingBudget < 0
-          ? ((-remainingBudget) / disposableBudget).clamp(0.0, double.infinity)
-          : 0.0;
-      desperation =
-          ((dailyPressure * 30) +
-                  (schedulePressure * 60) +
-                  (overBudgetPressure * 70))
-              .round()
-              .clamp(0, 100);
-    } else if (remainingBudget < 0) {
-      desperation = 100;
-    }
-
     return BudgetSnapshot(
       monthlyBudget: profile.monthlyBudget,
       fixedMonthlyExpenses: fixedMonthlyExpenses,
@@ -245,7 +254,14 @@ class AppRepository {
       remainingBudget: remainingBudget,
       daysLeft: daysLeft,
       dailyLimit: dailyLimit,
-      desperationIndex: desperation,
+      desperationIndex: calculateDesperationIndex(
+        disposableBudget: disposableBudget,
+        spentThisPeriod: spentThisPeriod,
+        remainingBudget: remainingBudget,
+        dailyLimit: dailyLimit,
+        idealDaily: idealDaily,
+        daysLeft: daysLeft,
+      ),
     );
   }
 

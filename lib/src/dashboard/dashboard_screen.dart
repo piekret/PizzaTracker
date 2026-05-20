@@ -87,6 +87,18 @@ class DashboardScreen extends ConsumerWidget {
                   ),
                   onAddExpense: () => _showAddExpense(context, ref),
                 ),
+                if (expenses.asData?.value.isEmpty ?? false) ...[
+                  const SizedBox(height: 14),
+                  _FirstRunNextStepCard(
+                    onScanReceipt: () => showReceiptUploadFlow(
+                      context: context,
+                      ref: ref,
+                      onExpenseSaved: () => _refreshExpenseData(ref),
+                    ),
+                    onAddExpense: () => _showAddExpense(context, ref),
+                    onAddFixedCost: () => _showAddFixedExpense(context, ref),
+                  ),
+                ],
                 const SizedBox(height: 18),
                 budget.when(
                   data: (value) => _DesperationCard(
@@ -200,6 +212,25 @@ class DashboardScreen extends ConsumerWidget {
     }
   }
 
+  Future<void> _showAddFixedExpense(BuildContext context, WidgetRef ref) async {
+    final saved = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => const AddFixedExpenseSheet(),
+    );
+
+    if (saved == true && context.mounted) {
+      ref.invalidate(fixedExpensesProvider);
+      ref.invalidate(budgetSnapshotProvider);
+      await Future.wait([
+        ref.read(fixedExpensesProvider.future),
+        ref.read(budgetSnapshotProvider.future),
+      ]);
+    }
+  }
+
   Future<void> _refreshExpenseData(WidgetRef ref) async {
     ref.invalidate(budgetSnapshotProvider);
     ref.invalidate(recentExpensesProvider);
@@ -211,6 +242,110 @@ class DashboardScreen extends ConsumerWidget {
       ref.read(recentExpensesProvider.future),
       ref.read(categorySpendingProvider.future),
     ]);
+  }
+}
+
+class _FirstRunNextStepCard extends StatelessWidget {
+  const _FirstRunNextStepCard({
+    required this.onScanReceipt,
+    required this.onAddExpense,
+    required this.onAddFixedCost,
+  });
+
+  final VoidCallback onScanReceipt;
+  final VoidCallback onAddExpense;
+  final VoidCallback onAddFixedCost;
+
+  @override
+  Widget build(BuildContext context) {
+    final text = context.text;
+
+    return FrostPanel(
+      padding: const EdgeInsets.all(20),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final icon = Container(
+            width: 54,
+            height: 54,
+            decoration: BoxDecoration(
+              gradient: context.palette.accentGradient,
+              borderRadius: BorderRadius.circular(18),
+            ),
+            child: const Icon(
+              Icons.rocket_launch_outlined,
+              color: Colors.white,
+            ),
+          );
+          final copy = Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Kicker(text.isPolish ? 'Następny krok' : 'Next step'),
+              const SizedBox(height: 6),
+              Text(
+                text.isPolish
+                    ? 'Budżet gotowy. Teraz dodaj pierwszy ślad.'
+                    : 'Budget ready. Now add the first trace.',
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+              const SizedBox(height: 6),
+              Text(
+                text.isPolish
+                    ? 'Pierwszy paragon albo ręczny wydatek odblokuje realny dzienny limit, kategorie i sensowne podpowiedzi AI.'
+                    : 'A first receipt or manual expense unlocks the real daily limit, categories, and useful AI insights.',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  height: 1.35,
+                ),
+              ),
+              const SizedBox(height: 14),
+              Wrap(
+                spacing: 10,
+                runSpacing: 10,
+                children: [
+                  FilledButton.icon(
+                    onPressed: onScanReceipt,
+                    icon: const Icon(Icons.document_scanner_outlined),
+                    label: Text(
+                      text.isPolish
+                          ? 'Dodaj pierwszy paragon'
+                          : 'Add first receipt',
+                    ),
+                  ),
+                  OutlinedButton.icon(
+                    onPressed: onAddExpense,
+                    icon: const Icon(Icons.add_rounded),
+                    label: Text(text.addExpense),
+                  ),
+                  TextButton.icon(
+                    onPressed: onAddFixedCost,
+                    icon: const Icon(Icons.home_work_outlined),
+                    label: Text(
+                      text.isPolish ? 'Dodaj stały koszt' : 'Add fixed cost',
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          );
+
+          if (constraints.maxWidth < 520) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [icon, const SizedBox(height: 14), copy],
+            );
+          }
+
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              icon,
+              const SizedBox(width: 16),
+              Expanded(child: copy),
+            ],
+          );
+        },
+      ),
+    );
   }
 }
 

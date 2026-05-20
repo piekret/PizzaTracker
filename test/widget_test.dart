@@ -222,6 +222,54 @@ void main() {
     expect(viewAllFinder, findsOneWidget);
   });
 
+  testWidgets('dashboard guides new users with no expenses', (tester) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          userProfileProvider.overrideWith((ref) async {
+            return const UserProfile(
+              id: 'user-id',
+              displayName: 'Tester',
+              monthlyBudget: 1200,
+              budgetResetDay: 1,
+              currency: 'USD',
+              timezone: 'Europe/Warsaw',
+              onboardingCompleted: true,
+            );
+          }),
+          budgetSnapshotProvider.overrideWith((ref) async {
+            return const BudgetSnapshot(
+              monthlyBudget: 1200,
+              fixedMonthlyExpenses: 0,
+              disposableBudget: 1200,
+              spentThisPeriod: 0,
+              remainingBudget: 1200,
+              daysLeft: 20,
+              dailyLimit: 60,
+              desperationIndex: 0,
+            );
+          }),
+          recentExpensesProvider.overrideWith((ref) async => const []),
+          expenseHistoryProvider.overrideWith((ref) async => const []),
+          categorySpendingProvider.overrideWith((ref) async => const []),
+          fixedExpensesProvider.overrideWith((ref) async => const []),
+          incomeEventsProvider.overrideWith((ref) async => const []),
+        ],
+        child: MaterialApp(
+          theme: buildAppTheme(AppThemePreset.pizza),
+          home: const DashboardScreen(),
+        ),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    expect(find.text('Budget ready. Now add the first trace.'), findsOneWidget);
+    expect(find.text('Add first receipt'), findsOneWidget);
+    expect(find.text('Add fixed cost'), findsWidgets);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('dashboard does not overflow at very narrow Polish width', (
     tester,
   ) async {

@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pizza_tracker/src/app_data.dart';
+import 'package:pizza_tracker/src/app_language.dart';
 
 void main() {
   group('ReceiptAnalysis', () {
@@ -188,5 +189,28 @@ void main() {
 
       expect(english, isNot(polish));
     });
+  });
+
+  group('AppText', () {
+    test('English error translation strips technical state prefixes', () {
+      const text = AppText(AppLanguage.english);
+
+      expect(
+        text.translateKnown('Bad state: You need to sign in first.'),
+        'You need to sign in first.',
+      );
+    });
+
+    test(
+      'Polish error translation strips and translates known state prefixes',
+      () {
+        const text = AppText(AppLanguage.polish);
+
+        expect(
+          text.translateKnown('Bad state: You need to sign in first.'),
+          'Najpierw musisz się zalogować.',
+        );
+      },
+    );
   });
 }

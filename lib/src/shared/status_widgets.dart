@@ -47,22 +47,22 @@ class _ErrorCard extends StatelessWidget {
         children: [
           SoftPill(
             label: context.text.isPolish
-                ? 'Coś się zepsuło'
-                : 'Something broke',
+                ? 'Nie udało się załadować'
+                : 'Could not load',
             icon: Icons.error_outline,
             color: Theme.of(context).colorScheme.error,
           ),
           const SizedBox(height: 12),
           Text(context.text.translateKnown(error.toString())),
-          if (hint != null) ...[
-            const SizedBox(height: 8),
-            Text(
-              context.text.translateKnown(hint!),
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
+          const SizedBox(height: 8),
+          Text(
+            context.text.translateKnown(
+              hint ?? 'Pull to refresh or try again in a moment.',
             ),
-          ],
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+          ),
         ],
       ),
     );

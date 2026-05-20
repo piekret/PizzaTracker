@@ -313,22 +313,27 @@ class AppText {
   }
 
   String translateKnown(String value) {
-    if (!isPolish) return value;
-    final direct = _plKnown[value];
+    var normalized = value;
+    final direct = isPolish ? _plKnown[value] : null;
     if (direct != null) {
       return direct;
     }
 
     for (final prefix in ['Bad state: ', 'Exception: ']) {
-      if (value.startsWith(prefix)) {
-        final translated = _plKnown[value.substring(prefix.length)];
+      if (normalized.startsWith(prefix)) {
+        normalized = normalized.substring(prefix.length);
+        if (!isPolish) {
+          return normalized;
+        }
+        final translated = _plKnown[normalized];
         if (translated != null) {
           return translated;
         }
       }
     }
 
-    return value;
+    if (!isPolish) return normalized;
+    return normalized;
   }
 }
 
@@ -341,8 +346,10 @@ const _plKnown = <String, String>{
   'Loading category totals...': 'Ładowanie sum według kategorii...',
   'Generating insights...': 'Generowanie insightów...',
   'Cached result': 'Wynik z cache',
-  'Check that the get_budget_snapshot RPC exists in Supabase.':
-      'Sprawdź, czy RPC get_budget_snapshot istnieje w Supabase.',
+  'Pull to refresh or try again in a moment.':
+      'Odśwież ekran albo spróbuj ponownie za chwilę.',
+  'Pull to refresh. If this keeps happening, check your profile and budget data.':
+      'Odśwież ekran. Jeśli problem wraca, sprawdź profil i dane budżetu.',
   'Can I afford this?': 'Czy mnie na to stać?',
   'Financial stupidity charts': 'Wykresy finansowych głupot',
   'See categories, spending pace, and the days that hit hardest.':

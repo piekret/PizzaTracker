@@ -111,7 +111,7 @@ class DashboardScreen extends ConsumerWidget {
                   error: (error, stackTrace) => _ErrorCard(
                     error: error,
                     hint:
-                        'Check that the get_budget_snapshot RPC exists in Supabase.',
+                        'Pull to refresh. If this keeps happening, check your profile and budget data.',
                   ),
                 ),
                 const SizedBox(height: 14),

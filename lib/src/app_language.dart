@@ -151,6 +151,8 @@ class AppText {
   String get expenseSaved => isPolish ? 'Wydatek zapisany.' : 'Expense saved.';
   String get expenseUpdated =>
       isPolish ? 'Wydatek zaktualizowany.' : 'Expense updated.';
+  String get saveChanges => isPolish ? 'Zapisz zmiany' : 'Save changes';
+  String get saveExpense => isPolish ? 'Zapisz wydatek' : 'Save expense';
   String get nameRequired =>
       isPolish ? 'Nazwa jest wymagana.' : 'Name is required.';
   String get enterAmountAboveZero =>
@@ -228,6 +230,7 @@ class AppText {
   String get recipesLocked => isPolish
       ? 'Przepisy odblokują się przy Indeksie Desperacji 60/100.'
       : 'Recipes unlock at Desperation Index 60/100.';
+  String get locked => isPolish ? 'Zablokowane' : 'Locked';
   String get setupKicker =>
       isPolish ? 'Brak lokalnej konfiguracji' : 'Local config missing';
   String get setupTitle =>
@@ -269,6 +272,20 @@ class AppText {
       'fun' => isPolish ? 'Rozrywka' : 'Fun',
       _ => other,
     };
+  }
+
+  List<String> get ingredientSuggestions {
+    return isPolish
+        ? const [
+            'makaron',
+            'jajka',
+            'cebula',
+            'ryż',
+            'fasola',
+            'ser',
+            'pomidor',
+          ]
+        : const ['pasta', 'eggs', 'onion', 'rice', 'beans', 'cheese', 'tomato'];
   }
 
   ({String label, String shortLabel}) levelText(int index) {

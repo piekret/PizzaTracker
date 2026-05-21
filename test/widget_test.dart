@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/date_symbol_data_local.dart';
 import 'package:intl/intl.dart';
 import 'package:pizza_tracker/src/app_config.dart';
 import 'package:pizza_tracker/src/app_data.dart';
@@ -11,7 +14,9 @@ import 'package:pizza_tracker/src/pizza_tracker_app.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
-  setUp(() {
+  setUp(() async {
+    await initializeDateFormatting('en');
+    await initializeDateFormatting('pl');
     Intl.defaultLocale = 'en';
     SharedPreferences.setMockInitialValues({});
   });
@@ -267,6 +272,77 @@ void main() {
     expect(find.text('Budget ready. Add your first expense.'), findsOneWidget);
     expect(find.text('Scan first receipt'), findsOneWidget);
     expect(find.text('Add fixed cost'), findsWidgets);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+    'dashboard hero gives positive pizza verdict when budget is safe',
+    (tester) async {
+      await _pumpDashboard(
+        tester,
+        snapshot: const BudgetSnapshot(
+          monthlyBudget: 1200,
+          fixedMonthlyExpenses: 200,
+          disposableBudget: 1000,
+          spentThisPeriod: 250,
+          remainingBudget: 750,
+          daysLeft: 15,
+          dailyLimit: 50,
+          desperationIndex: 18,
+        ),
+      );
+
+      expect(find.text('Pizza is defensible tonight.'), findsOneWidget);
+      expect(find.text('TODAY LIMIT: \$50.00'), findsOneWidget);
+      expect(find.text('LEFT: \$750.00'), findsOneWidget);
+      expect(find.text('15 DAYS LEFT'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('dashboard hero warns when daily budget is tight', (
+    tester,
+  ) async {
+    await _pumpDashboard(
+      tester,
+      snapshot: const BudgetSnapshot(
+        monthlyBudget: 900,
+        fixedMonthlyExpenses: 250,
+        disposableBudget: 650,
+        spentThisPeriod: 570,
+        remainingBudget: 80,
+        daysLeft: 10,
+        dailyLimit: 8,
+        desperationIndex: 82,
+      ),
+    );
+
+    expect(find.text('Tonight is probably pasta.'), findsOneWidget);
+    expect(find.text('TODAY LIMIT: \$8.00'), findsOneWidget);
+    expect(find.text('LEFT: \$80.00'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('dashboard hero uses Polish presentation copy', (tester) async {
+    await _pumpDashboard(
+      tester,
+      language: AppLanguage.polish,
+      snapshot: const BudgetSnapshot(
+        monthlyBudget: 1200,
+        fixedMonthlyExpenses: 200,
+        disposableBudget: 1000,
+        spentThisPeriod: 610,
+        remainingBudget: 390,
+        daysLeft: 15,
+        dailyLimit: 26,
+        desperationIndex: 52,
+      ),
+    );
+
+    expect(find.text('Pizza możliwa, ale bez szaleństw.'), findsOneWidget);
+    expect(find.textContaining('LIMIT DZIŚ:'), findsOneWidget);
+    expect(find.textContaining('ZOSTAŁO:'), findsOneWidget);
+    expect(find.text('15 DNI DO KOŃCA'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -557,6 +633,7 @@ void main() {
     expect(find.text('Pizza Place'), findsOneWidget);
     expect(find.text('Save 2 expenses'), findsOneWidget);
     expect(find.text('Receipt total: \$42.50'), findsOneWidget);
+    expect(find.text('May 10, 2026'), findsOneWidget);
 
     final firstNameField = tester.widget<TextFormField>(
       find.byType(TextFormField).at(0),
@@ -568,4 +645,155 @@ void main() {
     expect(firstNameField.controller?.text, 'Margherita');
     expect(firstAmountField.controller?.text, '32.50');
   });
+
+  testWidgets('stats insights keep generating after scrolling away', (
+    tester,
+  ) async {
+    final insightsCompleter = Completer<InsightsResponse>();
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          userProfileProvider.overrideWith((ref) async {
+            return const UserProfile(
+              id: 'user-id',
+              displayName: 'Tester',
+              monthlyBudget: 1200,
+              budgetResetDay: 1,
+              currency: 'USD',
+              timezone: 'Europe/Warsaw',
+              onboardingCompleted: true,
+            );
+          }),
+          budgetSnapshotProvider.overrideWith((ref) async {
+            return const BudgetSnapshot(
+              monthlyBudget: 1200,
+              fixedMonthlyExpenses: 200,
+              disposableBudget: 1000,
+              spentThisPeriod: 350,
+              remainingBudget: 650,
+              daysLeft: 16,
+              dailyLimit: 40.625,
+              desperationIndex: 32,
+            );
+          }),
+          expenseHistoryProvider.overrideWith((ref) async {
+            return [
+              ExpenseItem(
+                id: 'expense-id',
+                name: 'Pizza night',
+                amount: 42.5,
+                category: 'food',
+                expenseDate: DateTime.now(),
+              ),
+            ];
+          }),
+          categorySpendingProvider.overrideWith((ref) async {
+            return const [
+              CategorySpending(category: 'food', amount: 42.5, itemCount: 1),
+            ];
+          }),
+          monthlySummaryProvider.overrideWith((ref) async {
+            return MonthlySummary(
+              month: DateTime(DateTime.now().year, DateTime.now().month),
+              totalSpent: 42.5,
+              receiptCount: 1,
+              amountByCategory: const {'food': 42.5},
+            );
+          }),
+          insightsProvider.overrideWith((ref, request) {
+            return insightsCompleter.future;
+          }),
+        ],
+        child: MaterialApp(
+          theme: buildAppTheme(AppThemePreset.pizza),
+          home: const StatsScreen(currency: 'USD'),
+        ),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+    final generateButton = find.widgetWithText(
+      FilledButton,
+      'Generate insights',
+    );
+    await tester.scrollUntilVisible(
+      generateButton,
+      500,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.ensureVisible(generateButton);
+    await tester.pumpAndSettle();
+    await tester.drag(find.byType(Scrollable).first, const Offset(0, -240));
+    await tester.pumpAndSettle();
+    await tester.tap(generateButton);
+    await tester.pump();
+
+    expect(find.text('Generating insights...'), findsOneWidget);
+
+    await tester.drag(find.byType(Scrollable).first, const Offset(0, 1200));
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.scrollUntilVisible(
+      find.text('Monthly roast'),
+      500,
+      scrollable: find.byType(Scrollable).first,
+    );
+
+    expect(find.text('Generating insights...'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+}
+
+Future<void> _pumpDashboard(
+  WidgetTester tester, {
+  required BudgetSnapshot snapshot,
+  AppLanguage language = AppLanguage.english,
+}) async {
+  await tester.pumpWidget(
+    ProviderScope(
+      overrides: [
+        initialAppLanguageProvider.overrideWithValue(language),
+        userProfileProvider.overrideWith((ref) async {
+          return const UserProfile(
+            id: 'user-id',
+            displayName: 'Tester',
+            monthlyBudget: 1200,
+            budgetResetDay: 1,
+            currency: 'USD',
+            timezone: 'Europe/Warsaw',
+            onboardingCompleted: true,
+          );
+        }),
+        budgetSnapshotProvider.overrideWith((ref) async => snapshot),
+        recentExpensesProvider.overrideWith((ref) async {
+          return [
+            ExpenseItem(
+              id: 'expense-id',
+              name: 'Demo groceries',
+              amount: 24.5,
+              category: 'food',
+              expenseDate: DateTime(2026, 5, 9),
+            ),
+          ];
+        }),
+        expenseHistoryProvider.overrideWith((ref) async => const []),
+        categorySpendingProvider.overrideWith((ref) async => const []),
+        fixedExpensesProvider.overrideWith((ref) async => const []),
+        incomeEventsProvider.overrideWith((ref) async => const []),
+      ],
+      child: MaterialApp(
+        locale: language.locale,
+        supportedLocales: AppLanguage.values.map((language) => language.locale),
+        localizationsDelegates: const [
+          GlobalMaterialLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+        ],
+        theme: buildAppTheme(AppThemePreset.pizza),
+        home: const DashboardScreen(),
+      ),
+    ),
+  );
+
+  await tester.pumpAndSettle();
 }

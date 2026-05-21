@@ -25,7 +25,7 @@ class _ReceiptReviewSheetState extends ConsumerState<ReceiptReviewSheet> {
   @override
   void initState() {
     super.initState();
-    _expenseDate = DateTime.now();
+    _expenseDate = widget.analysis.expenseDate ?? DateTime.now();
     _items = widget.analysis.items
         .map((item) => _ReceiptItemDraft.fromAnalysis(item))
         .toList();
@@ -76,8 +76,6 @@ class _ReceiptReviewSheetState extends ConsumerState<ReceiptReviewSheet> {
             expenses: expenses,
           );
 
-      await _refreshExpenseData();
-
       if (mounted) {
         _showSavedToast();
         Navigator.of(context).pop(true);
@@ -89,19 +87,6 @@ class _ReceiptReviewSheetState extends ConsumerState<ReceiptReviewSheet> {
         setState(() => _isSaving = false);
       }
     }
-  }
-
-  Future<void> _refreshExpenseData() async {
-    ref.invalidate(budgetSnapshotProvider);
-    ref.invalidate(recentExpensesProvider);
-    ref.invalidate(expenseHistoryProvider);
-    ref.invalidate(categorySpendingProvider);
-
-    await Future.wait([
-      ref.read(budgetSnapshotProvider.future),
-      ref.read(recentExpensesProvider.future),
-      ref.read(categorySpendingProvider.future),
-    ]);
   }
 
   void _showSavedToast() {

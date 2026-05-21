@@ -349,6 +349,59 @@ class _FirstRunNextStepCard extends StatelessWidget {
   }
 }
 
+({String title, String body, IconData icon}) _pizzaVerdict(
+  BuildContext context,
+  double? dailyLimit,
+  double? remaining,
+) {
+  final text = context.text;
+  if (dailyLimit == null || remaining == null) {
+    return (
+      title: text.isPolish
+          ? 'Najpierw ustaw budżet, potem pytaj o pizzę.'
+          : 'Set the budget first, then ask about pizza.',
+      body: text.isPolish
+          ? 'Gdy budżet i wydatki będą gotowe, ta karta pokaże prostą decyzję na dziś.'
+          : 'Once budget and expenses are ready, this card gives you a simple call for today.',
+      icon: Icons.tune_rounded,
+    );
+  }
+
+  if (remaining <= 0 || dailyLimit < 12) {
+    return (
+      title: text.isPolish
+          ? 'Dziś raczej makaron.'
+          : 'Tonight is probably pasta.',
+      body: text.isPolish
+          ? 'Budżet jest napięty. Dodaj wydatki na bieżąco i trzymaj się limitu, zanim pizza wygra z matematyką.'
+          : 'The budget is tight. Keep expenses updated and stay near the limit before pizza beats the math.',
+      icon: Icons.ramen_dining_outlined,
+    );
+  }
+
+  if (dailyLimit < 30) {
+    return (
+      title: text.isPolish
+          ? 'Pizza możliwa, ale bez szaleństw.'
+          : 'Pizza is possible, but keep it calm.',
+      body: text.isPolish
+          ? 'Limit dzienny jeszcze żyje, tylko nie zamieniaj jednego kawałka w cały rachunek za wieczór.'
+          : 'The daily limit is still alive, just do not turn one slice into a full evening bill.',
+      icon: Icons.local_pizza_outlined,
+    );
+  }
+
+  return (
+    title: text.isPolish
+        ? 'Pizza dziś się broni.'
+        : 'Pizza is defensible tonight.',
+    body: text.isPolish
+        ? 'Na dziś wygląda bezpiecznie. Zapisz paragon po wszystkim, żeby Indeks Desperacji nie udawał optymisty.'
+        : 'Today looks safe. Save the receipt afterwards so the Desperation Index does not fake optimism.',
+    icon: Icons.local_pizza_rounded,
+  );
+}
+
 class _StatsTeaserCard extends StatelessWidget {
   const _StatsTeaserCard({required this.currency});
 
@@ -569,44 +622,83 @@ class _DashboardHeroCard extends ConsumerWidget {
     final formatter = NumberFormat.simpleCurrency(name: currency);
     final dailyLimit = snapshot?.dailyLimit;
     final daysLeft = snapshot?.daysLeft;
+    final remaining = snapshot?.remainingBudget;
+    final level = _levelForIndex(snapshot?.desperationIndex ?? 0);
+    final verdict = _pizzaVerdict(context, dailyLimit, remaining);
 
     return FrostPanel(
-      padding: const EdgeInsets.all(22),
+      padding: const EdgeInsets.all(20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              const BrandMark(size: 46),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Kicker(text.canIAffordThis),
-                    const SizedBox(height: 6),
-                    Text(
-                      text.isPolish
-                          ? 'Śledź pieniądze, zanim znikną.'
-                          : 'Track the money before it disappears.',
-                      style: Theme.of(context).textTheme.titleLarge,
-                    ),
-                  ],
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final mark = Container(
+                width: 58,
+                height: 58,
+                decoration: BoxDecoration(
+                  color: level.color.withValues(alpha: 0.16),
+                  borderRadius: BorderRadius.circular(4),
+                  border: Border.all(color: context.palette.border, width: 2),
                 ),
-              ),
-            ],
+                child: Icon(verdict.icon, color: level.color, size: 30),
+              );
+              final copy = Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Kicker(text.canIAffordThis),
+                  const SizedBox(height: 8),
+                  Text(
+                    verdict.title,
+                    style: Theme.of(context).textTheme.headlineMedium,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    verdict.body,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      height: 1.35,
+                    ),
+                  ),
+                ],
+              );
+
+              if (constraints.maxWidth < 480) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [mark, const SizedBox(height: 14), copy],
+                );
+              }
+
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  mark,
+                  const SizedBox(width: 16),
+                  Expanded(child: copy),
+                ],
+              );
+            },
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 16),
           Wrap(
-            spacing: 8,
-            runSpacing: 8,
+            spacing: 10,
+            runSpacing: 10,
             children: [
               if (dailyLimit != null)
                 SoftPill(
                   label: text.isPolish
-                      ? 'Dzisiaj: ${formatter.format(dailyLimit)}'
-                      : 'Today: ${formatter.format(dailyLimit)}',
+                      ? 'Limit dziś: ${formatter.format(dailyLimit)}'
+                      : 'Today limit: ${formatter.format(dailyLimit)}',
                   icon: Icons.local_pizza_outlined,
+                  color: level.color,
+                ),
+              if (remaining != null)
+                SoftPill(
+                  label: text.isPolish
+                      ? 'Zostało: ${formatter.format(remaining)}'
+                      : 'Left: ${formatter.format(remaining)}',
+                  icon: Icons.savings_outlined,
                 ),
               if (daysLeft != null)
                 SoftPill(
@@ -616,15 +708,6 @@ class _DashboardHeroCard extends ConsumerWidget {
                   icon: Icons.calendar_month_outlined,
                 ),
             ],
-          ),
-          const SizedBox(height: 12),
-          Text(
-            text.isPolish
-                ? 'Aktualizuj wydatki, żeby dzienny limit i Indeks Desperacji były wiarygodne.'
-                : 'Keep expenses updated so the daily limit and Desperation Index stay accurate.',
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-            ),
           ),
           const SizedBox(height: 16),
           Wrap(

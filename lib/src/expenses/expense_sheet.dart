@@ -254,7 +254,7 @@ class _AddExpenseSheetState extends ConsumerState<AddExpenseSheet> {
                       dimension: 18,
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
-                  : Text(_isEditing ? 'Save changes' : 'Save expense'),
+                  : Text(_isEditing ? text.saveChanges : text.saveExpense),
             ),
           ],
         ),

@@ -13,15 +13,6 @@ class _RecipesScreenState extends ConsumerState<RecipesScreen> {
   final _ingredientController = TextEditingController();
   final _ingredients = <String>[];
   RecipeRequest? _lastRequest;
-  final _suggested = const [
-    'pasta',
-    'eggs',
-    'onion',
-    'rice',
-    'beans',
-    'cheese',
-    'tomato',
-  ];
 
   @override
   void dispose() {
@@ -68,7 +59,7 @@ class _RecipesScreenState extends ConsumerState<RecipesScreen> {
                       ingredients: _ingredients,
                       isLocked: isLocked,
                       onAdd: _addIngredient,
-                      suggestions: _suggested,
+                      suggestions: context.text.ingredientSuggestions,
                       onAddSuggestion: _addSuggested,
                       onRemove: _removeIngredient,
                     ),
@@ -200,11 +191,7 @@ class _RecipeIntroCard extends StatelessWidget {
                 ),
               ),
               SoftPill(
-                label: isLocked
-                    ? context.text.isPolish
-                          ? 'Zablokowane'
-                          : 'Locked'
-                    : level.shortLabel,
+                label: isLocked ? context.text.locked : level.shortLabel,
                 icon: isLocked ? Icons.lock_outline : level.icon,
                 color: isLocked
                     ? Theme.of(context).colorScheme.error

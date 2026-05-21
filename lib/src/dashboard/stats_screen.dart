@@ -474,12 +474,17 @@ class _InsightsActionCard extends ConsumerStatefulWidget {
       _InsightsActionCardState();
 }
 
-class _InsightsActionCardState extends ConsumerState<_InsightsActionCard> {
+class _InsightsActionCardState extends ConsumerState<_InsightsActionCard>
+    with AutomaticKeepAliveClientMixin {
   InsightsRequest? _request;
   bool _forceRefresh = false;
 
   @override
+  bool get wantKeepAlive => true;
+
+  @override
   Widget build(BuildContext context) {
+    super.build(context);
     final text = context.text;
     final month = DateFormat('yyyy-MM').format(DateTime.now());
     final request = InsightsRequest(

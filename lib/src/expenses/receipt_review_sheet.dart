@@ -228,8 +228,8 @@ class _ReceiptReviewSheetState extends ConsumerState<ReceiptReviewSheet> {
   }
 
   Future<void> _pickExpenseDate() async {
-    final firstDate = DateTime(2020);
-    final lastDate = DateTime.now().add(const Duration(days: 365));
+    final firstDate = DateTime(2000);
+    final lastDate = DateTime.now();
     final picked = await showDatePicker(
       context: context,
       initialDate: _safeExpenseDate(
@@ -264,8 +264,8 @@ DateTime _safeExpenseDate(
 }) {
   final fallback = DateTime.now();
   final value = date ?? fallback;
-  final min = firstDate ?? DateTime(2020);
-  final max = lastDate ?? fallback.add(const Duration(days: 365));
+  final min = firstDate ?? DateTime(2000);
+  final max = lastDate ?? fallback;
 
   if (value.isBefore(min) || value.isAfter(max)) {
     return fallback.isBefore(min) || fallback.isAfter(max) ? min : fallback;

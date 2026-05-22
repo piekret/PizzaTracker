@@ -662,7 +662,7 @@ void main() {
     expect(firstAmountField.controller?.text, '32.50');
   });
 
-  testWidgets('receipt review clamps stale analysis date before date picker', (
+  testWidgets('receipt review keeps old analysis date before date picker', (
     tester,
   ) async {
     await tester.pumpWidget(
@@ -710,7 +710,7 @@ void main() {
 
     await tester.pumpAndSettle();
 
-    expect(find.text('May 20, 2017'), findsNothing);
+    expect(find.text('May 20, 2017'), findsOneWidget);
 
     await tester.tap(find.byIcon(Icons.calendar_today_outlined));
     await tester.pumpAndSettle();

@@ -25,7 +25,7 @@ class _ReceiptReviewSheetState extends ConsumerState<ReceiptReviewSheet> {
   @override
   void initState() {
     super.initState();
-    _expenseDate = widget.analysis.expenseDate ?? DateTime.now();
+    _expenseDate = _safeExpenseDate(widget.analysis.expenseDate);
     _items = widget.analysis.items
         .map((item) => _ReceiptItemDraft.fromAnalysis(item))
         .toList();
@@ -75,6 +75,7 @@ class _ReceiptReviewSheetState extends ConsumerState<ReceiptReviewSheet> {
             expenseDate: _expenseDate,
             expenses: expenses,
           );
+      await _refreshExpenseData();
 
       if (mounted) {
         _showSavedToast();
@@ -104,6 +105,20 @@ class _ReceiptReviewSheetState extends ConsumerState<ReceiptReviewSheet> {
         margin: const EdgeInsets.all(16),
       ),
     );
+  }
+
+  Future<void> _refreshExpenseData() async {
+    ref.invalidate(budgetSnapshotProvider);
+    ref.invalidate(recentExpensesProvider);
+    ref.invalidate(expenseHistoryProvider);
+    ref.invalidate(categorySpendingProvider);
+    ref.invalidate(monthlySummaryProvider);
+
+    await Future.wait([
+      ref.read(budgetSnapshotProvider.future),
+      ref.read(recentExpensesProvider.future),
+      ref.read(categorySpendingProvider.future),
+    ]);
   }
 
   @override
@@ -213,11 +228,17 @@ class _ReceiptReviewSheetState extends ConsumerState<ReceiptReviewSheet> {
   }
 
   Future<void> _pickExpenseDate() async {
+    final firstDate = DateTime(2020);
+    final lastDate = DateTime.now().add(const Duration(days: 365));
     final picked = await showDatePicker(
       context: context,
-      initialDate: _expenseDate,
-      firstDate: DateTime(2020),
-      lastDate: DateTime.now().add(const Duration(days: 365)),
+      initialDate: _safeExpenseDate(
+        _expenseDate,
+        firstDate: firstDate,
+        lastDate: lastDate,
+      ),
+      firstDate: firstDate,
+      lastDate: lastDate,
     );
     if (picked != null && mounted) {
       setState(() => _expenseDate = picked);
@@ -234,6 +255,22 @@ class _ReceiptReviewSheetState extends ConsumerState<ReceiptReviewSheet> {
       removed.dispose();
     });
   }
+}
+
+DateTime _safeExpenseDate(
+  DateTime? date, {
+  DateTime? firstDate,
+  DateTime? lastDate,
+}) {
+  final fallback = DateTime.now();
+  final value = date ?? fallback;
+  final min = firstDate ?? DateTime(2020);
+  final max = lastDate ?? fallback.add(const Duration(days: 365));
+
+  if (value.isBefore(min) || value.isAfter(max)) {
+    return fallback.isBefore(min) || fallback.isAfter(max) ? min : fallback;
+  }
+  return value;
 }
 
 class _ReceiptReviewSummary extends StatelessWidget {

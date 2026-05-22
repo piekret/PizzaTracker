@@ -662,6 +662,63 @@ void main() {
     expect(firstAmountField.controller?.text, '32.50');
   });
 
+  testWidgets('receipt review clamps stale analysis date before date picker', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          userProfileProvider.overrideWith((ref) async {
+            return const UserProfile(
+              id: 'user-id',
+              displayName: 'Tester',
+              monthlyBudget: 1200,
+              budgetResetDay: 1,
+              currency: 'USD',
+              timezone: 'Europe/Warsaw',
+              onboardingCompleted: true,
+            );
+          }),
+        ],
+        child: MaterialApp(
+          theme: buildAppTheme(AppThemePreset.pizza),
+          home: Scaffold(
+            body: ReceiptReviewSheet(
+              receipt: ReceiptUpload(
+                id: 'receipt-id',
+                totalAmount: 20,
+                scannedAt: DateTime(2026, 5, 10),
+              ),
+              analysis: ReceiptAnalysis(
+                storeName: 'Old Receipt',
+                totalAmount: 20,
+                expenseDate: DateTime(2017, 5, 20),
+                confidence: 0.7,
+                items: const [
+                  ReceiptAnalysisItem(
+                    name: 'Old item',
+                    amount: 20,
+                    category: 'food',
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    expect(find.text('May 20, 2017'), findsNothing);
+
+    await tester.tap(find.byIcon(Icons.calendar_today_outlined));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(DatePickerDialog), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('receipt review explains line item total mismatch', (
     tester,
   ) async {

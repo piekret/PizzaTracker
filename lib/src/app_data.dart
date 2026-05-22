@@ -3,6 +3,7 @@ import 'dart:typed_data';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 final supabaseClientProvider = Provider<SupabaseClient>((ref) {
@@ -113,9 +114,11 @@ final insightsRefreshProvider =
     });
 
 const expenseCategories = ['food', 'alcohol', 'hygiene', 'fun', 'other'];
+const supportedCurrencies = ['PLN', 'USD', 'EUR', 'GBP', 'CHF', 'CZK'];
 const receiptImagesBucket = 'receipt-images';
 const _receiptSelectColumns =
     'id, store_name, total_amount, raw_ocr_text, analysis_json, image_path, scanned_at';
+const _offlineCachePrefix = 'offline_cache_v1';
 
 int calculateDesperationIndex({
   required double disposableBudget,
@@ -163,7 +166,7 @@ class AppRepository {
         .upsert(
           {
             'id': user.id,
-            'display_name': user.email?.split('@').first,
+            'display_name': user.email,
             'monthly_budget': 0,
             'budget_reset_day': 1,
             'currency': 'USD',
@@ -177,17 +180,33 @@ class AppRepository {
 
   Future<UserProfile> getProfile() async {
     final user = _requireUser();
-    await ensureProfile();
+    final cacheKey = _cacheKey(user.id, 'profile');
+    try {
+      await ensureProfile();
 
-    final row = await _client
-        .from('users_profiles')
-        .select(
-          'id, display_name, monthly_budget, budget_reset_day, currency, timezone, onboarding_completed',
-        )
-        .eq('id', user.id)
-        .single();
-
-    return UserProfile.fromMap(row);
+      final row = await _client
+          .from('users_profiles')
+          .select(
+            'id, display_name, monthly_budget, budget_reset_day, currency, timezone, onboarding_completed',
+          )
+          .eq('id', user.id)
+          .single();
+      final map = {
+        ...Map<String, dynamic>.from(row),
+        'display_name': user.email ?? row['display_name'],
+      };
+      await _writeCache(cacheKey, map);
+      return UserProfile.fromMap(map);
+    } catch (_) {
+      final cached = await _readCachedMap(cacheKey);
+      if (cached != null) {
+        return UserProfile.fromMap({
+          ...cached,
+          'display_name': user.email ?? cached['display_name'],
+        });
+      }
+      rethrow;
+    }
   }
 
   Future<void> updateBudget({
@@ -197,6 +216,10 @@ class AppRepository {
     bool onboardingCompleted = false,
   }) async {
     final user = _requireUser();
+    final normalizedCurrency = currency.trim().toUpperCase();
+    if (!supportedCurrencies.contains(normalizedCurrency)) {
+      throw StateError('Unsupported currency. Choose one from the list.');
+    }
     await ensureProfile();
 
     await _client
@@ -204,7 +227,7 @@ class AppRepository {
         .update({
           'monthly_budget': monthlyBudget,
           'budget_reset_day': budgetResetDay,
-          'currency': currency.trim().toUpperCase(),
+          'currency': normalizedCurrency,
           if (onboardingCompleted) 'onboarding_completed': true,
         })
         .eq('id', user.id);
@@ -212,112 +235,150 @@ class AppRepository {
 
   Future<BudgetSnapshot?> getBudgetSnapshot({DateTime? onDate}) async {
     final user = _requireUser();
-    final profile = await getProfile();
-    final date = onDate ?? DateTime.now();
-    final today = DateTime(date.year, date.month, date.day);
-    final period = _budgetPeriodFor(today, profile.budgetResetDay);
-    final dateFormat = DateFormat('yyyy-MM-dd');
+    final cacheKey = _cacheKey(user.id, 'budget_snapshot');
+    try {
+      final profile = await getProfile();
+      final date = onDate ?? DateTime.now();
+      final today = DateTime(date.year, date.month, date.day);
+      final period = _budgetPeriodFor(today, profile.budgetResetDay);
+      final dateFormat = DateFormat('yyyy-MM-dd');
 
-    final fixedRows = await _client
-        .from('fixed_expenses')
-        .select('amount')
-        .eq('user_id', user.id)
-        .eq('is_active', true);
-    final fixedMonthlyExpenses = fixedRows.fold<double>(0, (sum, row) {
-      return sum + _toDouble(Map<String, dynamic>.from(row)['amount']);
-    });
+      final fixedRows = await _client
+          .from('fixed_expenses')
+          .select('amount')
+          .eq('user_id', user.id)
+          .eq('is_active', true);
+      final fixedMonthlyExpenses = fixedRows.fold<double>(0, (sum, row) {
+        return sum + _toDouble(Map<String, dynamic>.from(row)['amount']);
+      });
 
-    final expenseRows = await _client
-        .from('expense_items')
-        .select('amount')
-        .eq('user_id', user.id)
-        .gte('expense_date', dateFormat.format(period.start))
-        .lte('expense_date', dateFormat.format(period.end));
-    final spentThisPeriod = expenseRows.fold<double>(0, (sum, row) {
-      return sum + _toDouble(Map<String, dynamic>.from(row)['amount']);
-    });
+      final expenseRows = await _client
+          .from('expense_items')
+          .select('amount')
+          .eq('user_id', user.id)
+          .gte('expense_date', dateFormat.format(period.start))
+          .lte('expense_date', dateFormat.format(period.end));
+      final spentThisPeriod = expenseRows.fold<double>(0, (sum, row) {
+        return sum + _toDouble(Map<String, dynamic>.from(row)['amount']);
+      });
 
-    final disposableBudget = (profile.monthlyBudget - fixedMonthlyExpenses)
-        .clamp(0, double.infinity)
-        .toDouble();
-    final remainingBudget = disposableBudget - spentThisPeriod;
-    final daysLeft = (period.end.difference(today).inDays + 1).clamp(0, 1000);
-    final totalDays = period.end.difference(period.start).inDays + 1;
-    final dailyLimit = remainingBudget / daysLeft.clamp(1, 1000);
-    final idealDaily = disposableBudget / totalDays.clamp(1, 1000);
-
-    return BudgetSnapshot(
-      monthlyBudget: profile.monthlyBudget,
-      fixedMonthlyExpenses: fixedMonthlyExpenses,
-      disposableBudget: disposableBudget,
-      spentThisPeriod: spentThisPeriod,
-      remainingBudget: remainingBudget,
-      daysLeft: daysLeft,
-      dailyLimit: dailyLimit,
-      desperationIndex: calculateDesperationIndex(
+      final disposableBudget = (profile.monthlyBudget - fixedMonthlyExpenses)
+          .clamp(0, double.infinity)
+          .toDouble();
+      final remainingBudget = disposableBudget - spentThisPeriod;
+      final daysLeft = (period.end.difference(today).inDays + 1).clamp(0, 1000);
+      final totalDays = period.end.difference(period.start).inDays + 1;
+      final dailyLimit = remainingBudget / daysLeft.clamp(1, 1000);
+      final idealDaily = disposableBudget / totalDays.clamp(1, 1000);
+      final snapshot = BudgetSnapshot(
+        monthlyBudget: profile.monthlyBudget,
+        fixedMonthlyExpenses: fixedMonthlyExpenses,
         disposableBudget: disposableBudget,
         spentThisPeriod: spentThisPeriod,
         remainingBudget: remainingBudget,
-        dailyLimit: dailyLimit,
-        idealDaily: idealDaily,
         daysLeft: daysLeft,
-      ),
-    );
+        dailyLimit: dailyLimit,
+        desperationIndex: calculateDesperationIndex(
+          disposableBudget: disposableBudget,
+          spentThisPeriod: spentThisPeriod,
+          remainingBudget: remainingBudget,
+          dailyLimit: dailyLimit,
+          idealDaily: idealDaily,
+          daysLeft: daysLeft,
+        ),
+      );
+      await _writeCache(cacheKey, snapshot.toMap());
+      return snapshot;
+    } catch (_) {
+      final cached = await _readCachedMap(cacheKey);
+      if (cached != null) {
+        return BudgetSnapshot.fromMap(cached);
+      }
+      rethrow;
+    }
   }
 
   Future<List<ExpenseItem>> getRecentExpenses() async {
     final user = _requireUser();
+    final cacheKey = _cacheKey(user.id, 'recent_expenses');
 
-    final rows = await _client
-        .from('expense_items')
-        .select(
-          'id, receipt_id, name, amount, category, expense_date, created_at',
-        )
-        .eq('user_id', user.id)
-        .order('expense_date', ascending: false)
-        .order('created_at', ascending: false)
-        .limit(12);
-
-    return rows
-        .map((row) => ExpenseItem.fromMap(Map<String, dynamic>.from(row)))
-        .toList();
+    try {
+      final rows = await _client
+          .from('expense_items')
+          .select(
+            'id, receipt_id, name, amount, category, expense_date, created_at',
+          )
+          .eq('user_id', user.id)
+          .order('expense_date', ascending: false)
+          .order('created_at', ascending: false)
+          .limit(12);
+      final maps = rows.map((row) => Map<String, dynamic>.from(row)).toList();
+      await _writeCache(cacheKey, maps);
+      return maps.map(ExpenseItem.fromMap).toList();
+    } catch (_) {
+      final cached = await _readCachedList(cacheKey);
+      if (cached != null) {
+        return cached.map(ExpenseItem.fromMap).toList();
+      }
+      rethrow;
+    }
   }
 
   Future<List<ExpenseItem>> getExpenseHistory() async {
     final user = _requireUser();
+    final cacheKey = _cacheKey(user.id, 'expense_history');
 
-    final rows = await _client
-        .from('expense_items')
-        .select(
-          'id, receipt_id, name, amount, category, expense_date, created_at',
-        )
-        .eq('user_id', user.id)
-        .order('expense_date', ascending: false)
-        .order('created_at', ascending: false);
-
-    return rows
-        .map((row) => ExpenseItem.fromMap(Map<String, dynamic>.from(row)))
-        .toList();
+    try {
+      final rows = await _client
+          .from('expense_items')
+          .select(
+            'id, receipt_id, name, amount, category, expense_date, created_at',
+          )
+          .eq('user_id', user.id)
+          .order('expense_date', ascending: false)
+          .order('created_at', ascending: false);
+      final maps = rows.map((row) => Map<String, dynamic>.from(row)).toList();
+      await _writeCache(cacheKey, maps);
+      return maps.map(ExpenseItem.fromMap).toList();
+    } catch (_) {
+      final cached = await _readCachedList(cacheKey);
+      if (cached != null) {
+        return cached.map(ExpenseItem.fromMap).toList();
+      }
+      rethrow;
+    }
   }
 
   Future<MonthlySummary?> getMonthlySummary() async {
     final user = _requireUser();
+    final cacheKey = _cacheKey(user.id, 'monthly_summary');
 
-    final data = await _client
-        .from('v_monthly_summary')
-        .select(
-          'month, total_spent, food_spent, alcohol_spent, hygiene_spent, fun_spent, other_spent, receipt_count',
-        )
-        .eq('user_id', user.id)
-        .order('month', ascending: false)
-        .limit(1)
-        .maybeSingle();
+    try {
+      final data = await _client
+          .from('v_monthly_summary')
+          .select(
+            'month, total_spent, food_spent, alcohol_spent, hygiene_spent, fun_spent, other_spent, receipt_count',
+          )
+          .eq('user_id', user.id)
+          .order('month', ascending: false)
+          .limit(1)
+          .maybeSingle();
 
-    if (data == null) {
-      return null;
+      if (data == null) {
+        await _writeCache(cacheKey, null);
+        return null;
+      }
+
+      final map = Map<String, dynamic>.from(data);
+      await _writeCache(cacheKey, map);
+      return MonthlySummary.fromMap(map);
+    } catch (_) {
+      final cached = await _readCachedMap(cacheKey);
+      if (cached != null) {
+        return MonthlySummary.fromMap(cached);
+      }
+      rethrow;
     }
-
-    return MonthlySummary.fromMap(Map<String, dynamic>.from(data));
   }
 
   Future<List<CategorySpending>> getCategorySpending({
@@ -325,6 +386,7 @@ class AppRepository {
     DateTime? onDate,
   }) async {
     final user = _requireUser();
+    final cacheKey = _cacheKey(user.id, 'category_spending');
     final period = _budgetPeriodFor(
       onDate ?? DateTime.now(),
       profile.budgetResetDay,
@@ -333,77 +395,104 @@ class AppRepository {
     final amountByCategory = <String, double>{};
     final countByCategory = <String, int>{};
 
-    final rows = await _client
-        .from('expense_items')
-        .select('category, amount')
-        .eq('user_id', user.id)
-        .gte('expense_date', dateFormat.format(period.start))
-        .lte('expense_date', dateFormat.format(period.end));
+    try {
+      final rows = await _client
+          .from('expense_items')
+          .select('category, amount')
+          .eq('user_id', user.id)
+          .gte('expense_date', dateFormat.format(period.start))
+          .lte('expense_date', dateFormat.format(period.end));
 
-    for (final row in rows) {
-      final map = Map<String, dynamic>.from(row);
-      final rawCategory = (map['category'] as String?) ?? 'other';
-      final category = expenseCategories.contains(rawCategory)
-          ? rawCategory
-          : 'other';
+      for (final row in rows) {
+        final map = Map<String, dynamic>.from(row);
+        final rawCategory = (map['category'] as String?) ?? 'other';
+        final category = expenseCategories.contains(rawCategory)
+            ? rawCategory
+            : 'other';
 
-      amountByCategory[category] =
-          (amountByCategory[category] ?? 0) + _toDouble(map['amount']);
-      countByCategory[category] = (countByCategory[category] ?? 0) + 1;
-    }
-
-    final spending = amountByCategory.entries
-        .where((entry) => entry.value > 0)
-        .map(
-          (entry) => CategorySpending(
-            category: entry.key,
-            amount: entry.value,
-            itemCount: countByCategory[entry.key] ?? 0,
-          ),
-        )
-        .toList();
-
-    spending.sort((a, b) {
-      final amountComparison = b.amount.compareTo(a.amount);
-      if (amountComparison != 0) {
-        return amountComparison;
+        amountByCategory[category] =
+            (amountByCategory[category] ?? 0) + _toDouble(map['amount']);
+        countByCategory[category] = (countByCategory[category] ?? 0) + 1;
       }
-      return expenseCategories
-          .indexOf(a.category)
-          .compareTo(expenseCategories.indexOf(b.category));
-    });
 
-    return spending;
+      final spending = amountByCategory.entries
+          .where((entry) => entry.value > 0)
+          .map(
+            (entry) => CategorySpending(
+              category: entry.key,
+              amount: entry.value,
+              itemCount: countByCategory[entry.key] ?? 0,
+            ),
+          )
+          .toList();
+
+      spending.sort((a, b) {
+        final amountComparison = b.amount.compareTo(a.amount);
+        if (amountComparison != 0) {
+          return amountComparison;
+        }
+        return expenseCategories
+            .indexOf(a.category)
+            .compareTo(expenseCategories.indexOf(b.category));
+      });
+      await _writeCache(
+        cacheKey,
+        spending.map((item) => item.toMap()).toList(),
+      );
+      return spending;
+    } catch (_) {
+      final cached = await _readCachedList(cacheKey);
+      if (cached != null) {
+        return cached.map(CategorySpending.fromMap).toList();
+      }
+      rethrow;
+    }
   }
 
   Future<List<FixedExpense>> getFixedExpenses() async {
     final user = _requireUser();
+    final cacheKey = _cacheKey(user.id, 'fixed_expenses');
 
-    final rows = await _client
-        .from('fixed_expenses')
-        .select('id, name, amount, billing_day, is_active')
-        .eq('user_id', user.id)
-        .order('billing_day')
-        .order('name');
-
-    return rows
-        .map((row) => FixedExpense.fromMap(Map<String, dynamic>.from(row)))
-        .toList();
+    try {
+      final rows = await _client
+          .from('fixed_expenses')
+          .select('id, name, amount, billing_day, is_active')
+          .eq('user_id', user.id)
+          .order('billing_day')
+          .order('name');
+      final maps = rows.map((row) => Map<String, dynamic>.from(row)).toList();
+      await _writeCache(cacheKey, maps);
+      return maps.map(FixedExpense.fromMap).toList();
+    } catch (_) {
+      final cached = await _readCachedList(cacheKey);
+      if (cached != null) {
+        return cached.map(FixedExpense.fromMap).toList();
+      }
+      rethrow;
+    }
   }
 
   Future<List<IncomeEvent>> getIncomeEvents() async {
     final user = _requireUser();
+    final cacheKey = _cacheKey(user.id, 'income_events');
 
-    final rows = await _client
-        .from('income_events')
-        .select('id, name, amount, expected_day, is_recurring')
-        .eq('user_id', user.id)
-        .order('expected_day')
-        .order('name');
-
-    return rows
-        .map((row) => IncomeEvent.fromMap(Map<String, dynamic>.from(row)))
-        .toList();
+    try {
+      final rows = await _client
+          .from('income_events')
+          .select('id, name, amount, expected_day, is_recurring')
+          .eq('user_id', user.id)
+          .order('expected_day')
+          .order('name');
+      final maps = rows.map((row) => Map<String, dynamic>.from(row)).toList();
+      await _writeCache(cacheKey, maps);
+      return maps.map(IncomeEvent.fromMap).toList();
+    } catch (_) {
+      final cached = await _readCachedList(cacheKey);
+      if (cached != null) {
+        return cached.map(IncomeEvent.fromMap).toList();
+      }
+      rethrow;
+    }
   }
 
   Future<void> addManualExpense({
@@ -427,6 +516,7 @@ class AppRepository {
     }
 
     await _client.from('expense_items').insert(values);
+    await _clearExpenseCaches(user.id);
   }
 
   Future<void> addReceiptExpenses({
@@ -471,6 +561,7 @@ class AppRepository {
     }).toList();
 
     await _client.from('expense_items').insert(values);
+    await _clearExpenseCaches(user.id);
   }
 
   Future<void> updateExpense({
@@ -497,6 +588,7 @@ class AppRepository {
         .update(values)
         .eq('id', id)
         .eq('user_id', user.id);
+    await _clearExpenseCaches(user.id);
   }
 
   Future<ReceiptUpload> createReceiptUpload({
@@ -641,6 +733,7 @@ class AppRepository {
         .delete()
         .eq('id', id)
         .eq('user_id', user.id);
+    await _clearExpenseCaches(user.id);
 
     if (receiptId != null) {
       try {
@@ -668,6 +761,7 @@ class AppRepository {
       'billing_day': billingDay,
       'is_active': true,
     });
+    await _clearPlanningCaches(user.id);
   }
 
   Future<void> deleteFixedExpense(String id) async {
@@ -678,6 +772,7 @@ class AppRepository {
         .delete()
         .eq('id', id)
         .eq('user_id', user.id);
+    await _clearPlanningCaches(user.id);
   }
 
   Future<void> addIncomeEvent({
@@ -695,6 +790,7 @@ class AppRepository {
       'expected_day': expectedDay,
       'is_recurring': isRecurring,
     });
+    await _clearIncomeCaches(user.id);
   }
 
   Future<void> deleteIncomeEvent(String id) async {
@@ -705,6 +801,7 @@ class AppRepository {
         .delete()
         .eq('id', id)
         .eq('user_id', user.id);
+    await _clearIncomeCaches(user.id);
   }
 
   Future<List<RecipeSuggestion>> generateRecipes({
@@ -820,6 +917,66 @@ class AppRepository {
     }
     return user;
   }
+
+  String _cacheKey(String userId, String name) {
+    return '$_offlineCachePrefix.$userId.$name';
+  }
+
+  Future<void> _writeCache(String key, Object? value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(key, jsonEncode(value));
+  }
+
+  Future<Map<String, dynamic>?> _readCachedMap(String key) async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(key);
+    if (raw == null) {
+      return null;
+    }
+    final decoded = jsonDecode(raw);
+    return decoded is Map ? Map<String, dynamic>.from(decoded) : null;
+  }
+
+  Future<List<Map<String, dynamic>>?> _readCachedList(String key) async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(key);
+    if (raw == null) {
+      return null;
+    }
+    final decoded = jsonDecode(raw);
+    if (decoded is! List) {
+      return null;
+    }
+    return decoded
+        .whereType<Map>()
+        .map((item) => Map<String, dynamic>.from(item))
+        .toList();
+  }
+
+  Future<void> _clearExpenseCaches(String userId) async {
+    await _removeCacheKeys(userId, const [
+      'budget_snapshot',
+      'recent_expenses',
+      'expense_history',
+      'monthly_summary',
+      'category_spending',
+    ]);
+  }
+
+  Future<void> _clearPlanningCaches(String userId) async {
+    await _removeCacheKeys(userId, const ['budget_snapshot', 'fixed_expenses']);
+  }
+
+  Future<void> _clearIncomeCaches(String userId) async {
+    await _removeCacheKeys(userId, const ['income_events']);
+  }
+
+  Future<void> _removeCacheKeys(String userId, List<String> names) async {
+    final prefs = await SharedPreferences.getInstance();
+    await Future.wait(
+      names.map((name) => prefs.remove(_cacheKey(userId, name))),
+    );
+  }
 }
 
 class UserProfile {
@@ -886,6 +1043,19 @@ class BudgetSnapshot {
       dailyLimit: _toDouble(map['daily_limit']),
       desperationIndex: _toInt(map['desperation_index']).clamp(0, 100),
     );
+  }
+
+  Map<String, Object> toMap() {
+    return {
+      'monthly_budget': monthlyBudget,
+      'fixed_monthly_expenses': fixedMonthlyExpenses,
+      'disposable_budget': disposableBudget,
+      'spent_this_period': spentThisPeriod,
+      'remaining_budget': remainingBudget,
+      'days_left': daysLeft,
+      'daily_limit': dailyLimit,
+      'desperation_index': desperationIndex,
+    };
   }
 }
 
@@ -1057,6 +1227,18 @@ class CategorySpending {
   final String category;
   final double amount;
   final int itemCount;
+
+  factory CategorySpending.fromMap(Map<String, dynamic> map) {
+    return CategorySpending(
+      category: map['category']?.toString() ?? 'other',
+      amount: _toDouble(map['amount']),
+      itemCount: _toInt(map['item_count']),
+    );
+  }
+
+  Map<String, Object> toMap() {
+    return {'category': category, 'amount': amount, 'item_count': itemCount};
+  }
 }
 
 class FixedExpense {

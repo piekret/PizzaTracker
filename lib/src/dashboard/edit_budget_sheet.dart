@@ -29,7 +29,9 @@ class _EditBudgetSheetState extends ConsumerState<EditBudgetSheet> {
     _resetDayController = TextEditingController(
       text: '${widget.profile.budgetResetDay}',
     );
-    _currencyController = TextEditingController(text: widget.profile.currency);
+    _currencyController = TextEditingController(
+      text: _normalizeCurrencyCode(widget.profile.currency),
+    );
   }
 
   @override
@@ -131,22 +133,28 @@ class _EditBudgetSheetState extends ConsumerState<EditBudgetSheet> {
               },
             ),
             const SizedBox(height: 12),
-            TextFormField(
-              controller: _currencyController,
+            DropdownButtonFormField<String>(
+              isExpanded: true,
+              initialValue: _normalizeCurrencyCode(_currencyController.text),
               decoration: InputDecoration(
                 labelText: text.isPolish ? 'Waluta' : 'Currency',
                 prefixIcon: const Icon(Icons.attach_money_outlined),
               ),
-              textCapitalization: TextCapitalization.characters,
-              validator: (value) {
-                final currency = (value ?? '').trim();
-                if (currency.length < 3 || currency.length > 8) {
-                  return text.isPolish
-                      ? 'Użyj kodu waluty, np. USD albo PLN.'
-                      : 'Use a currency code like USD or PLN.';
-                }
-                return null;
+              selectedItemBuilder: (context) {
+                return supportedCurrencies
+                    .map((currency) => Text(currency))
+                    .toList();
               },
+              items: supportedCurrencies.map((currency) {
+                return DropdownMenuItem(
+                  value: currency,
+                  child: Text(
+                    _currencyLabel(context, currency),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                );
+              }).toList(),
+              onChanged: (value) => _currencyController.text = value ?? 'PLN',
             ),
             if (_error != null) ...[
               const SizedBox(height: 12),

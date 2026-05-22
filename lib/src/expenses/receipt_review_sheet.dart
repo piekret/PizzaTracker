@@ -157,34 +157,15 @@ class _ReceiptReviewSheetState extends ConsumerState<ReceiptReviewSheet> {
               ),
             ),
             const SizedBox(height: 14),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: _pickExpenseDate,
-                    icon: const Icon(Icons.calendar_today_outlined),
-                    label: Text(
-                      DateFormat.yMMMd(
-                        text.appLanguage.code,
-                      ).format(_expenseDate),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                SoftPill(label: formatter.format(_total)),
-              ],
+            _ReceiptReviewSummary(
+              date: _expenseDate,
+              itemTotal: _total,
+              receiptTotal: receiptTotal,
+              formatter: formatter,
+              onPickDate: _pickExpenseDate,
             ),
-            if (receiptTotal != null && receiptTotal > 0) ...[
-              const SizedBox(height: 8),
-              Text(
-                text.receiptTotal(formatter.format(receiptTotal)),
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
-              ),
-            ],
             if (showMismatch) ...[
-              const SizedBox(height: 8),
+              const SizedBox(height: 10),
               _InlineError(
                 message: text.lineItemsTotal(
                   formatter.format(_total),
@@ -252,6 +233,65 @@ class _ReceiptReviewSheetState extends ConsumerState<ReceiptReviewSheet> {
       final removed = _items.removeAt(index);
       removed.dispose();
     });
+  }
+}
+
+class _ReceiptReviewSummary extends StatelessWidget {
+  const _ReceiptReviewSummary({
+    required this.date,
+    required this.itemTotal,
+    required this.receiptTotal,
+    required this.formatter,
+    required this.onPickDate,
+  });
+
+  final DateTime date;
+  final double itemTotal;
+  final double? receiptTotal;
+  final NumberFormat formatter;
+  final VoidCallback onPickDate;
+
+  @override
+  Widget build(BuildContext context) {
+    final text = context.text;
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: context.palette.surfaceStrong,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: context.palette.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Kicker(text.receiptTotalsCheck, overflow: TextOverflow.ellipsis),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              OutlinedButton.icon(
+                onPressed: onPickDate,
+                icon: const Icon(Icons.calendar_today_outlined),
+                label: Text(
+                  DateFormat.yMMMd(text.appLanguage.code).format(date),
+                ),
+              ),
+              SoftPill(
+                label: text.lineItemsReviewTotal(formatter.format(itemTotal)),
+                icon: Icons.playlist_add_check_rounded,
+              ),
+              if (receiptTotal != null && receiptTotal! > 0)
+                SoftPill(
+                  label: text.receiptTotal(formatter.format(receiptTotal)),
+                  icon: Icons.receipt_long_outlined,
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
   }
 }
 

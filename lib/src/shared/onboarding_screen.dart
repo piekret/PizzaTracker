@@ -32,7 +32,9 @@ class _OnboardingSetupScreenState extends ConsumerState<OnboardingSetupScreen> {
     _resetDayController = TextEditingController(
       text: '${widget.profile.budgetResetDay}',
     );
-    _currencyController = TextEditingController(text: widget.profile.currency);
+    _currencyController = TextEditingController(
+      text: _normalizeCurrencyCode(widget.profile.currency),
+    );
   }
 
   @override
@@ -343,22 +345,28 @@ class _OnboardingBudgetCard extends StatelessWidget {
                 keyboardType: TextInputType.number,
                 validator: _validateMonthDay,
               );
-              final currencyField = TextFormField(
-                controller: currencyController,
+              final currencyField = DropdownButtonFormField<String>(
+                isExpanded: true,
+                initialValue: _normalizeCurrencyCode(currencyController.text),
                 decoration: InputDecoration(
                   labelText: text.isPolish ? 'Waluta' : 'Currency',
                   prefixIcon: const Icon(Icons.attach_money_outlined),
                 ),
-                textCapitalization: TextCapitalization.characters,
-                validator: (value) {
-                  final currency = (value ?? '').trim();
-                  if (currency.length < 3 || currency.length > 8) {
-                    return text.isPolish
-                        ? 'Użyj kodu waluty, np. USD albo PLN.'
-                        : 'Use a currency code like USD or PLN.';
-                  }
-                  return null;
+                selectedItemBuilder: (context) {
+                  return supportedCurrencies
+                      .map((currency) => Text(currency))
+                      .toList();
                 },
+                items: supportedCurrencies.map((currency) {
+                  return DropdownMenuItem(
+                    value: currency,
+                    child: Text(
+                      _currencyLabel(context, currency),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  );
+                }).toList(),
+                onChanged: (value) => currencyController.text = value ?? 'PLN',
               );
 
               if (constraints.maxWidth < 420) {

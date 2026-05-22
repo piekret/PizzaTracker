@@ -170,52 +170,119 @@ class _RecipeIntroCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final level = _levelForIndex(desperationIndex);
+    final unlockCopy = _recipeUnlockCopy(context, desperationIndex, isLocked);
+
     return FrostPanel(
       padding: const EdgeInsets.all(20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Kicker(context.text.desperationIndex),
-                    const SizedBox(height: 6),
-                    Text(
-                      '$desperationIndex / 100',
-                      style: Theme.of(context).textTheme.titleLarge,
-                    ),
-                  ],
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final accent = isLocked
+                  ? Theme.of(context).colorScheme.error
+                  : level.color;
+              final icon = Container(
+                width: 56,
+                height: 56,
+                decoration: BoxDecoration(
+                  color: accent.withValues(alpha: 0.14),
+                  borderRadius: BorderRadius.circular(4),
+                  border: Border.all(color: context.palette.border, width: 2),
                 ),
-              ),
-              SoftPill(
-                label: isLocked ? context.text.locked : level.shortLabel,
-                icon: isLocked ? Icons.lock_outline : level.icon,
-                color: isLocked
-                    ? Theme.of(context).colorScheme.error
-                    : level.color,
-              ),
-            ],
+                child: Icon(
+                  isLocked ? Icons.lock_outline : Icons.soup_kitchen_outlined,
+                  color: accent,
+                ),
+              );
+              final copy = Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Kicker(context.text.desperationIndex),
+                  const SizedBox(height: 6),
+                  Text(
+                    unlockCopy.title,
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      SoftPill(
+                        label: '$desperationIndex / 100',
+                        icon: Icons.speed_outlined,
+                        color: accent,
+                      ),
+                      SoftPill(
+                        label: isLocked
+                            ? context.text.locked
+                            : level.shortLabel,
+                        icon: isLocked ? Icons.lock_outline : level.icon,
+                        color: accent,
+                      ),
+                    ],
+                  ),
+                ],
+              );
+
+              if (constraints.maxWidth < 460) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [icon, const SizedBox(height: 14), copy],
+                );
+              }
+
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  icon,
+                  const SizedBox(width: 16),
+                  Expanded(child: copy),
+                ],
+              );
+            },
           ),
           const SizedBox(height: 10),
           Text(
-            isLocked
-                ? context.text.isPolish
-                      ? 'Przepisy odblokują się, gdy budżet wejdzie w tryb kryzysowy (Indeks 60+).'
-                      : 'Recipes unlock when your budget hits crisis mode (Index 60+).'
-                : context.text.isPolish
-                ? 'Powiedz, co zostało w kuchni. Zrobię z tego coś jadalnego.'
-                : 'Tell me what is left in your kitchen. I will make it edible.',
+            unlockCopy.body,
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
               color: Theme.of(context).colorScheme.onSurfaceVariant,
+              height: 1.35,
             ),
           ),
         ],
       ),
     );
   }
+}
+
+({String title, String body}) _recipeUnlockCopy(
+  BuildContext context,
+  int desperationIndex,
+  bool isLocked,
+) {
+  final text = context.text;
+  if (isLocked) {
+    final pointsLeft = (60 - desperationIndex).clamp(0, 60);
+    return (
+      title: text.isPolish
+          ? 'Kuchnia awaryjna jeszcze śpi.'
+          : 'Emergency kitchen is still asleep.',
+      body: text.isPolish
+          ? 'Brakuje $pointsLeft punktów Indeksu Desperacji do odblokowania. Na razie budżet nie wygląda wystarczająco dramatycznie.'
+          : '$pointsLeft Desperation Index points to unlock. For now, the budget is not dramatic enough.',
+    );
+  }
+
+  return (
+    title: text.isPolish
+        ? 'Tryb przetrwania odblokowany.'
+        : 'Survival kitchen unlocked.',
+    body: text.isPolish
+        ? 'Wpisz to, co zostało w kuchni. AI spróbuje zrobić z tego tani posiłek zamiast kolejnej wymówki na dostawę.'
+        : 'Add what is left in the kitchen. AI will try to turn it into a cheap meal instead of another delivery excuse.',
+  );
 }
 
 class _IngredientInputCard extends StatelessWidget {
@@ -275,33 +342,10 @@ class _IngredientInputCard extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           if (ingredients.isEmpty)
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  context.text.isPolish
-                      ? 'Dodaj co najmniej 2 składniki dla lepszych wyników.'
-                      : 'Add at least 2 ingredients for better results.',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
-                ),
-                const SizedBox(height: 10),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: suggestions
-                      .map(
-                        (item) => InputChip(
-                          label: Text(item),
-                          onPressed: isLocked
-                              ? null
-                              : () => onAddSuggestion(item),
-                        ),
-                      )
-                      .toList(),
-                ),
-              ],
+            _IngredientEmptyState(
+              isLocked: isLocked,
+              suggestions: suggestions,
+              onAddSuggestion: onAddSuggestion,
             )
           else
             Wrap(
@@ -316,6 +360,76 @@ class _IngredientInputCard extends StatelessWidget {
                   )
                   .toList(),
             ),
+        ],
+      ),
+    );
+  }
+}
+
+class _IngredientEmptyState extends StatelessWidget {
+  const _IngredientEmptyState({
+    required this.isLocked,
+    required this.suggestions,
+    required this.onAddSuggestion,
+  });
+
+  final bool isLocked;
+  final List<String> suggestions;
+  final ValueChanged<String> onAddSuggestion;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: context.palette.surfaceStrong,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: context.palette.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.inventory_2_outlined,
+                color: context.palette.primaryGlow,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  context.text.isPolish
+                      ? 'Pantry check: zacznij od dwóch rzeczy.'
+                      : 'Pantry check: start with two things.',
+                  style: Theme.of(context).textTheme.titleSmall,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            context.text.isPolish
+                ? 'Kliknij sugestie albo wpisz własne składniki. Im bardziej prawdziwa lista, tym mniej smutny obiad.'
+                : 'Tap suggestions or type your own ingredients. The more honest the list, the less tragic the meal.',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+              height: 1.35,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: suggestions
+                .map(
+                  (item) => InputChip(
+                    label: Text(item),
+                    onPressed: isLocked ? null : () => onAddSuggestion(item),
+                  ),
+                )
+                .toList(),
+          ),
         ],
       ),
     );
@@ -365,8 +479,11 @@ class _RecipesResultPanel extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     if (isLocked) {
-      return _ChartEmptyState(
+      return _RecipeStatusCard(
         icon: Icons.lock_outline,
+        title: context.text.isPolish
+            ? 'Przepisy czekają na kryzys.'
+            : 'Recipes are waiting for crisis mode.',
         message: context.text.isPolish
             ? 'Przepisy odblokują się, gdy Indeks Desperacji osiągnie 60.'
             : 'Recipes unlock once the desperation index hits 60.',
@@ -374,8 +491,11 @@ class _RecipesResultPanel extends ConsumerWidget {
     }
 
     if (request == null) {
-      return _ChartEmptyState(
+      return _RecipeStatusCard(
         icon: Icons.restaurant_menu_outlined,
+        title: context.text.isPolish
+            ? 'Jeszcze nie gotujemy.'
+            : 'Nothing is cooking yet.',
         message: context.text.isPolish
             ? 'Dodaj składniki i wygeneruj menu przetrwania.'
             : 'Add ingredients and generate your survival menu.',
@@ -388,8 +508,11 @@ class _RecipesResultPanel extends ConsumerWidget {
     return recipes.when(
       data: (value) {
         if (value.isEmpty) {
-          return _ChartEmptyState(
+          return _RecipeStatusCard(
             icon: Icons.restaurant_outlined,
+            title: context.text.isPolish
+                ? 'AI wróciło z pustą patelnią.'
+                : 'AI came back with an empty pan.',
             message: context.text.isPolish
                 ? 'Nie wrócił żaden przepis. Spróbuj dodać więcej składników.'
                 : 'No recipes came back. Try adding more ingredients.',
@@ -411,6 +534,57 @@ class _RecipesResultPanel extends ConsumerWidget {
             : 'Generating recipes...',
       ),
       error: (error, stackTrace) => _ErrorCard(error: error),
+    );
+  }
+}
+
+class _RecipeStatusCard extends StatelessWidget {
+  const _RecipeStatusCard({
+    required this.icon,
+    required this.title,
+    required this.message,
+  });
+
+  final IconData icon;
+  final String title;
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return FrostPanel(
+      padding: const EdgeInsets.all(18),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+              color: context.palette.primaryGlow.withValues(alpha: 0.14),
+              borderRadius: BorderRadius.circular(4),
+              border: Border.all(color: context.palette.border, width: 2),
+            ),
+            child: Icon(icon, color: context.palette.primaryGlow),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: Theme.of(context).textTheme.titleMedium),
+                const SizedBox(height: 4),
+                Text(
+                  message,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    height: 1.35,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

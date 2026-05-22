@@ -114,7 +114,7 @@ void main() {
     test('parses completed onboarding flag', () {
       final profile = UserProfile.fromMap({
         'id': 'user-id',
-        'display_name': 'Tester',
+        'display_name': 'tester@example.com',
         'monthly_budget': 1200,
         'budget_reset_day': 1,
         'currency': 'USD',
@@ -122,6 +122,7 @@ void main() {
         'onboarding_completed': true,
       });
 
+      expect(profile.displayName, 'tester@example.com');
       expect(profile.onboardingCompleted, isTrue);
     });
   });
@@ -164,6 +165,41 @@ void main() {
       );
 
       expect(index, greaterThan(50));
+    });
+  });
+
+  group('offline cache models', () {
+    test('BudgetSnapshot round-trips through cache map', () {
+      const snapshot = BudgetSnapshot(
+        monthlyBudget: 1200,
+        fixedMonthlyExpenses: 300,
+        disposableBudget: 900,
+        spentThisPeriod: 180,
+        remainingBudget: 720,
+        daysLeft: 18,
+        dailyLimit: 40,
+        desperationIndex: 24,
+      );
+
+      final restored = BudgetSnapshot.fromMap(snapshot.toMap());
+
+      expect(restored.monthlyBudget, snapshot.monthlyBudget);
+      expect(restored.remainingBudget, snapshot.remainingBudget);
+      expect(restored.desperationIndex, snapshot.desperationIndex);
+    });
+
+    test('CategorySpending round-trips through cache map', () {
+      const spending = CategorySpending(
+        category: 'food',
+        amount: 42.5,
+        itemCount: 3,
+      );
+
+      final restored = CategorySpending.fromMap(spending.toMap());
+
+      expect(restored.category, 'food');
+      expect(restored.amount, 42.5);
+      expect(restored.itemCount, 3);
     });
   });
 
@@ -212,5 +248,12 @@ void main() {
         );
       },
     );
+  });
+
+  group('supportedCurrencies', () {
+    test('contains only selectable app currencies', () {
+      expect(supportedCurrencies, containsAll(['PLN', 'USD', 'EUR']));
+      expect(supportedCurrencies, isNot(contains('DOGE')));
+    });
   });
 }

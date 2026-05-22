@@ -153,6 +153,13 @@ class _StatsSummaryCard extends StatelessWidget {
           ).format(summary!.month);
     final remaining = budget?.remainingBudget;
     final dailyLimit = budget?.dailyLimit;
+    final narrative = _monthSummaryNarrative(
+      context,
+      spent: spent,
+      remaining: remaining,
+      dailyLimit: dailyLimit,
+      formatter: formatter,
+    );
 
     return FrostPanel(
       padding: const EdgeInsets.all(20),
@@ -179,18 +186,34 @@ class _StatsSummaryCard extends StatelessWidget {
               SoftPill(label: formatter.format(spent)),
             ],
           ),
+          const SizedBox(height: 10),
+          Text(
+            narrative,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+              height: 1.35,
+            ),
+          ),
           const SizedBox(height: 14),
           LayoutBuilder(
             builder: (context, constraints) {
               final width = constraints.maxWidth;
-              final tileWidth = width >= 520
-                  ? (width - 24) / 3
+              final tileWidth = width >= 620
+                  ? (width - 36) / 4
                   : (width - 12) / 2;
 
               return Wrap(
                 spacing: 12,
                 runSpacing: 12,
                 children: [
+                  SizedBox(
+                    width: tileWidth,
+                    child: MetricTile(
+                      label: context.text.spent,
+                      value: formatter.format(spent),
+                      icon: Icons.payments_outlined,
+                    ),
+                  ),
                   SizedBox(
                     width: tileWidth,
                     child: MetricTile(
@@ -241,7 +264,12 @@ class _StatsHeroCard extends ConsumerWidget {
     final spent = budget?.spentThisPeriod ?? 0;
     final remaining = budget?.remainingBudget ?? 0;
     final daysLeft = budget?.daysLeft ?? 0;
+    final disposable = budget?.disposableBudget ?? 0;
+    final spentRatio = disposable <= 0
+        ? 0.0
+        : (spent / disposable).clamp(0.0, 1.0);
     final level = _levelForIndex(budget?.desperationIndex ?? 0);
+    final pace = _budgetPaceCopy(context, spentRatio, remaining);
 
     return FrostPanel(
       padding: const EdgeInsets.all(22),
@@ -260,10 +288,17 @@ class _StatsHeroCard extends ConsumerWidget {
                   Kicker(context.text.budgetStory),
                   const SizedBox(height: 6),
                   Text(
-                    context.text.thisMonthInOneGlance,
+                    context.text.isPolish ? 'Tempo budżetu' : 'Budget pace',
                     style: Theme.of(context).textTheme.titleLarge,
                   ),
                 ],
+              ),
+              SoftPill(
+                label: context.text.isPolish
+                    ? '${(spentRatio * 100).round()}% użyte'
+                    : '${(spentRatio * 100).round()}% used',
+                icon: Icons.speed_outlined,
+                color: level.color,
               ),
               SoftPill(
                 label: level.shortLabel,
@@ -273,23 +308,20 @@ class _StatsHeroCard extends ConsumerWidget {
             ],
           ),
           const SizedBox(height: 12),
+          Text(pace.title, style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: 6),
           Text(
-            level.label,
+            pace.body,
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
               color: Theme.of(context).colorScheme.onSurfaceVariant,
+              height: 1.35,
             ),
           ),
           const SizedBox(height: 12),
           ClipRRect(
             borderRadius: BorderRadius.circular(999),
             child: LinearProgressIndicator(
-              value: budget == null
-                  ? 0
-                  : (budget.spentThisPeriod /
-                            (budget.disposableBudget == 0
-                                ? 1
-                                : budget.disposableBudget))
-                        .clamp(0.0, 1.0),
+              value: budget == null ? 0 : spentRatio,
               minHeight: 8,
               backgroundColor: context.palette.border.withValues(alpha: 0.4),
               valueColor: AlwaysStoppedAnimation(level.color),
@@ -337,6 +369,83 @@ class _StatsHeroCard extends ConsumerWidget {
       ),
     );
   }
+}
+
+String _monthSummaryNarrative(
+  BuildContext context, {
+  required double spent,
+  required double? remaining,
+  required double? dailyLimit,
+  required NumberFormat formatter,
+}) {
+  final text = context.text;
+  if (spent <= 0) {
+    return text.isPolish
+        ? 'Ten miesiąc jest jeszcze czysty. Dodaj wydatki, żeby wykresy miały co roastować.'
+        : 'This month is still clean. Add expenses so the charts have something to roast.';
+  }
+
+  if (remaining == null || dailyLimit == null) {
+    return text.isPolish
+        ? 'Masz już zapisane wydatki. Ustaw pełny budżet, żeby zobaczyć limit dzienny i tempo miesiąca.'
+        : 'Expenses are logged. Set the full budget to see the daily limit and monthly pace.';
+  }
+
+  if (remaining <= 0) {
+    return text.isPolish
+        ? 'Budżet przekroczony. Od teraz każdy paragon to materiał dowodowy.'
+        : 'Budget is over the line. Every receipt is evidence now.';
+  }
+
+  return text.isPolish
+      ? 'Po wydatkach zostaje ${formatter.format(remaining)}, czyli około ${formatter.format(dailyLimit)} dziennie.'
+      : 'After expenses, ${formatter.format(remaining)} remains, about ${formatter.format(dailyLimit)} per day.';
+}
+
+({String title, String body}) _budgetPaceCopy(
+  BuildContext context,
+  double spentRatio,
+  double remaining,
+) {
+  final text = context.text;
+  if (remaining < 0 || spentRatio >= 1) {
+    return (
+      title: text.isPolish
+          ? 'Budżet już przebił sufit.'
+          : 'The budget has hit the ceiling.',
+      body: text.isPolish
+          ? 'Statystyki są teraz trybem kontroli szkód: sprawdź kategorie i tnij największe wycieki.'
+          : 'Stats are now damage control: check categories and cut the biggest leaks.',
+    );
+  }
+  if (spentRatio >= 0.75) {
+    return (
+      title: text.isPolish
+          ? 'Końcówka miesiąca robi się ostra.'
+          : 'The end of the month is getting spicy.',
+      body: text.isPolish
+          ? 'Większość budżetu już poszła. Kategorie poniżej pokażą, kto zjadł największy kawałek.'
+          : 'Most of the budget is already gone. The categories below show who took the biggest slice.',
+    );
+  }
+  if (spentRatio >= 0.45) {
+    return (
+      title: text.isPolish
+          ? 'Budżet jest w połowie drogi.'
+          : 'The budget is halfway through the oven.',
+      body: text.isPolish
+          ? 'Jeszcze jest kontrola, ale tempo wydatków warto sprawdzić zanim zrobi się chrupiąco.'
+          : 'Still under control, but check the spending pace before things get crispy.',
+    );
+  }
+  return (
+    title: text.isPolish
+        ? 'Pieniądze jeszcze oddychają.'
+        : 'The pizza money is still breathing.',
+    body: text.isPolish
+        ? 'Wydatki są spokojne. Zapisuj paragony dalej, żeby ten wykres nie kłamał z optymizmu.'
+        : 'Spending is calm. Keep logging receipts so this chart does not lie with optimism.',
+  );
 }
 
 class _AbsurdPurchaseRow extends StatelessWidget {
@@ -830,6 +939,20 @@ class _CategoryPieCard extends StatelessWidget {
                 ],
               );
             },
+          ),
+          const SizedBox(height: 8),
+          Text(
+            spending.isEmpty
+                ? context.text.isPolish
+                      ? 'Dodaj kilka wydatków, a pokażemy, która kategoria robi największy bałagan.'
+                      : 'Add a few expenses and this will show which category is making the biggest mess.'
+                : context.text.isPolish
+                ? 'Szybki podział tego, gdzie uciekły pieniądze w bieżącym okresie.'
+                : 'A quick split of where the money escaped in the current period.',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+              height: 1.35,
+            ),
           ),
           const SizedBox(height: 12),
           if (spending.isEmpty)

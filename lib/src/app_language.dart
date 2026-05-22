@@ -183,9 +183,13 @@ class AppText {
       isPolish ? '$percent% pewności' : '$percent% confidence';
   String receiptTotal(String total) =>
       isPolish ? 'Suma paragonu: $total' : 'Receipt total: $total';
+  String lineItemsReviewTotal(String total) =>
+      isPolish ? 'Pozycje: $total' : 'Items: $total';
   String lineItemsTotal(String itemsTotal, String receiptTotal) => isPolish
-      ? 'Suma pozycji $itemsTotal. Suma paragonu $receiptTotal.'
-      : 'Line items total $itemsTotal. Receipt total $receiptTotal.';
+      ? 'Suma pozycji to $itemsTotal, a paragon pokazuje $receiptTotal. Sprawdź, czy czegoś nie brakuje albo czy OCR nie odczytał ceny źle.'
+      : 'Line items total $itemsTotal, but the receipt shows $receiptTotal. Check for a missing item or an OCR price mistake.';
+  String get receiptTotalsCheck =>
+      isPolish ? 'Kontrola paragonu' : 'Receipt check';
   String saveExpenseCount(int count) => isPolish
       ? count == 1
             ? 'Zapisz 1 wydatek'
@@ -407,6 +411,10 @@ const _plKnown = <String, String>{
   'Add at least one receipt item.':
       'Dodaj co najmniej jedną pozycję z paragonu.',
   'You need to sign in first.': 'Najpierw musisz się zalogować.',
+  'Email not confirmed': 'Email nie został jeszcze potwierdzony.',
+  'Invalid login credentials': 'Nieprawidłowy email albo hasło.',
+  'Unsupported currency. Choose one from the list.':
+      'Nieobsługiwana waluta. Wybierz jedną z listy.',
   'Unexpected receipt analysis response.':
       'Nieoczekiwana odpowiedź analizy paragonu.',
   'Unsupported receipt image format. Use JPG, PNG, or WebP.':

@@ -75,6 +75,11 @@ class DashboardScreen extends ConsumerWidget {
               ),
               children: [
                 _DashboardHeader(
+                  onOpenProfile: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (context) => const _UserProfileScreen(),
+                    ),
+                  ),
                   onSignOut: () =>
                       ref.read(supabaseClientProvider).auth.signOut(),
                 ),
@@ -349,6 +354,209 @@ class _FirstRunNextStepCard extends StatelessWidget {
   }
 }
 
+class _UserProfileScreen extends ConsumerWidget {
+  const _UserProfileScreen();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final profile = ref.watch(userProfileProvider);
+    final budget = ref.watch(budgetSnapshotProvider).asData?.value;
+
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      body: AppBackground(
+        child: SafeArea(
+          child: ListView(
+            padding: EdgeInsets.fromLTRB(
+              _responsiveGutter(context),
+              14,
+              _responsiveGutter(context),
+              80,
+            ),
+            children: [
+              _SimpleScreenHeader(
+                kicker: context.text.isPolish ? 'Profil' : 'Profile',
+                title: context.text.isPolish
+                    ? 'Widok użytkownika'
+                    : 'User profile',
+                onBack: () => Navigator.of(context).pop(),
+              ),
+              const SizedBox(height: 18),
+              profile.when(
+                data: (value) =>
+                    _UserProfilePanel(profile: value, budget: budget),
+                loading: () => _LoadingCard(label: context.text.loadingProfile),
+                error: (error, stackTrace) => _ErrorCard(error: error),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SimpleScreenHeader extends StatelessWidget {
+  const _SimpleScreenHeader({
+    required this.kicker,
+    required this.title,
+    required this.onBack,
+  });
+
+  final String kicker;
+  final String title;
+  final VoidCallback onBack;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        _RoundIconButton(
+          tooltip: context.text.back,
+          icon: Icons.arrow_back_rounded,
+          onPressed: onBack,
+        ),
+        const SizedBox(width: 14),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Kicker(kicker),
+              const SizedBox(height: 4),
+              Text(title, style: Theme.of(context).textTheme.titleLarge),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _UserProfilePanel extends StatelessWidget {
+  const _UserProfilePanel({required this.profile, required this.budget});
+
+  final UserProfile profile;
+  final BudgetSnapshot? budget;
+
+  @override
+  Widget build(BuildContext context) {
+    final formatter = NumberFormat.simpleCurrency(name: profile.currency);
+    final displayName = profile.displayName?.trim().isNotEmpty == true
+        ? profile.displayName!.trim()
+        : 'Student';
+    final budgetState = profile.monthlyBudget > 0
+        ? context.text.isPolish
+              ? 'Budżet aktywny'
+              : 'Budget active'
+        : context.text.isPolish
+        ? 'Budżet do ustawienia'
+        : 'Budget needs setup';
+
+    return FrostPanel(
+      padding: const EdgeInsets.all(22),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final avatar = Container(
+                width: 64,
+                height: 64,
+                decoration: BoxDecoration(
+                  color: context.palette.primaryGlow.withValues(alpha: 0.16),
+                  borderRadius: BorderRadius.circular(4),
+                  border: Border.all(color: context.palette.border, width: 2),
+                ),
+                child: Icon(
+                  Icons.person_outline,
+                  color: context.palette.primaryGlow,
+                  size: 34,
+                ),
+              );
+              final copy = Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Kicker(
+                    context.text.isPolish
+                        ? 'Konto użytkownika'
+                        : 'User account',
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    displayName,
+                    style: Theme.of(context).textTheme.headlineMedium,
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    context.text.isPolish
+                        ? 'Dane profilu i aktualna konfiguracja budżetu.'
+                        : 'Profile details and current budget configuration.',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      height: 1.35,
+                    ),
+                  ),
+                ],
+              );
+
+              if (constraints.maxWidth < 480) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [avatar, const SizedBox(height: 14), copy],
+                );
+              }
+
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  avatar,
+                  const SizedBox(width: 16),
+                  Expanded(child: copy),
+                ],
+              );
+            },
+          ),
+          const SizedBox(height: 18),
+          Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            children: [
+              MetricTile(
+                label: context.text.isPolish ? 'Status' : 'Status',
+                value: budgetState,
+                icon: Icons.verified_outlined,
+              ),
+              MetricTile(
+                label: context.text.isPolish ? 'Waluta' : 'Currency',
+                value: profile.currency,
+                icon: Icons.payments_outlined,
+              ),
+              MetricTile(
+                label: context.text.isPolish ? 'Reset budżetu' : 'Budget reset',
+                value: context.text.isPolish
+                    ? 'Dzień ${profile.budgetResetDay}'
+                    : 'Day ${profile.budgetResetDay}',
+                icon: Icons.event_repeat_outlined,
+              ),
+              MetricTile(
+                label: context.text.monthlyBudgetLockedIn,
+                value: formatter.format(profile.monthlyBudget),
+                icon: Icons.account_balance_wallet_outlined,
+              ),
+              if (budget != null)
+                MetricTile(
+                  label: context.text.remaining,
+                  value: formatter.format(budget!.remainingBudget),
+                  icon: Icons.savings_outlined,
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 ({String title, String body, IconData icon}) _pizzaVerdict(
   BuildContext context,
   double? dailyLimit,
@@ -529,8 +737,12 @@ class _RecipesTeaserCard extends ConsumerWidget {
 }
 
 class _DashboardHeader extends StatelessWidget {
-  const _DashboardHeader({required this.onSignOut});
+  const _DashboardHeader({
+    required this.onOpenProfile,
+    required this.onSignOut,
+  });
 
+  final VoidCallback onOpenProfile;
   final VoidCallback onSignOut;
 
   @override
@@ -571,6 +783,11 @@ class _DashboardHeader extends StatelessWidget {
       children: [
         const _ThemePresetMenu(),
         const _LanguageMenu(),
+        _RoundIconButton(
+          tooltip: text.isPolish ? 'Profil użytkownika' : 'User profile',
+          icon: Icons.person_outline,
+          onPressed: onOpenProfile,
+        ),
         _RoundIconButton(
           tooltip: text.signOut,
           icon: Icons.logout_rounded,

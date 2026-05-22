@@ -48,18 +48,28 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
           password: password,
         );
         if (response.session == null) {
-          await client.auth.signInWithPassword(
-            email: email,
-            password: password,
-          );
+          if (!mounted) return;
+          setState(() {
+            _message = context.text.isPolish
+                ? 'Konto utworzone. Sprawdź skrzynkę email i potwierdź adres przed logowaniem.'
+                : 'Account created. Check your email and confirm the address before signing in.';
+            _isSignUp = false;
+            _confirmPasswordController.clear();
+          });
         }
       } else {
         await client.auth.signInWithPassword(email: email, password: password);
       }
     } on AuthException catch (error) {
-      setState(() => _message = error.message);
+      if (mounted) {
+        setState(() => _message = context.text.translateKnown(error.message));
+      }
     } catch (error) {
-      setState(() => _message = error.toString());
+      if (mounted) {
+        setState(
+          () => _message = context.text.translateKnown(error.toString()),
+        );
+      }
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);

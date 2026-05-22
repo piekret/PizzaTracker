@@ -90,7 +90,7 @@ void main() {
           userProfileProvider.overrideWith((ref) async {
             return const UserProfile(
               id: 'user-id',
-              displayName: 'Tester',
+              displayName: 'tester@example.com',
               monthlyBudget: 1200,
               budgetResetDay: 1,
               currency: 'USD',
@@ -180,7 +180,20 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Add receipt'), findsOneWidget);
+    expect(find.byTooltip('User profile'), findsOneWidget);
     expect(find.textContaining('DESPERATION INDEX'), findsWidgets);
+
+    await tester.tap(find.byTooltip('User profile'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('User profile'), findsOneWidget);
+    expect(find.text('tester@example.com'), findsOneWidget);
+    expect(find.text('Budget active'), findsOneWidget);
+    expect(find.text('USD'), findsWidgets);
+    expect(find.text('Day 1'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Back'));
+    await tester.pumpAndSettle();
 
     await tester.scrollUntilVisible(
       find.text('Monthly budget locked in'),
@@ -474,6 +487,7 @@ void main() {
 
     expect(find.text('Set the basics in one minute'), findsOneWidget);
     expect(find.text('Your monthly budget'), findsOneWidget);
+    expect(find.text('USD'), findsOneWidget);
 
     await tester.scrollUntilVisible(
       find.text('Add your biggest fixed cost'),
@@ -630,9 +644,11 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.textContaining('RECEIPT REVIEW'), findsWidgets);
+    expect(find.textContaining('RECEIPT CHECK'), findsWidgets);
     expect(find.text('Pizza Place'), findsOneWidget);
     expect(find.text('Save 2 expenses'), findsOneWidget);
-    expect(find.text('Receipt total: \$42.50'), findsOneWidget);
+    expect(find.text('ITEMS: \$42.50'), findsOneWidget);
+    expect(find.text('RECEIPT TOTAL: \$42.50'), findsOneWidget);
     expect(find.text('May 10, 2026'), findsOneWidget);
 
     final firstNameField = tester.widget<TextFormField>(
@@ -644,6 +660,67 @@ void main() {
 
     expect(firstNameField.controller?.text, 'Margherita');
     expect(firstAmountField.controller?.text, '32.50');
+  });
+
+  testWidgets('receipt review explains line item total mismatch', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          userProfileProvider.overrideWith((ref) async {
+            return const UserProfile(
+              id: 'user-id',
+              displayName: 'Tester',
+              monthlyBudget: 1200,
+              budgetResetDay: 1,
+              currency: 'USD',
+              timezone: 'Europe/Warsaw',
+              onboardingCompleted: true,
+            );
+          }),
+        ],
+        child: MaterialApp(
+          theme: buildAppTheme(AppThemePreset.pizza),
+          home: Scaffold(
+            body: ReceiptReviewSheet(
+              receipt: ReceiptUpload(
+                id: 'receipt-id',
+                totalAmount: 50,
+                scannedAt: DateTime(2026, 5, 10),
+              ),
+              analysis: ReceiptAnalysis(
+                storeName: 'Corner Shop',
+                totalAmount: 50,
+                expenseDate: DateTime(2026, 5, 10),
+                confidence: 0.7,
+                items: const [
+                  ReceiptAnalysisItem(
+                    name: 'Sandwich',
+                    amount: 12,
+                    category: 'food',
+                  ),
+                  ReceiptAnalysisItem(
+                    name: 'Juice',
+                    amount: 8,
+                    category: 'food',
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    expect(find.text('ITEMS: \$20.00'), findsOneWidget);
+    expect(find.text('RECEIPT TOTAL: \$50.00'), findsOneWidget);
+    expect(
+      find.textContaining('Check for a missing item or an OCR price mistake.'),
+      findsOneWidget,
+    );
   });
 
   testWidgets('stats insights keep generating after scrolling away', (
@@ -742,6 +819,127 @@ void main() {
     expect(find.text('Generating insights...'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('stats screen presents budget pace and category story', (
+    tester,
+  ) async {
+    await _pumpStatsScreen(
+      tester,
+      snapshot: const BudgetSnapshot(
+        monthlyBudget: 1200,
+        fixedMonthlyExpenses: 200,
+        disposableBudget: 1000,
+        spentThisPeriod: 520,
+        remainingBudget: 480,
+        daysLeft: 12,
+        dailyLimit: 40,
+        desperationIndex: 48,
+      ),
+      expenses: [
+        ExpenseItem(
+          id: 'expense-pizza',
+          name: 'Pizza night',
+          amount: 42.5,
+          category: 'food',
+          expenseDate: DateTime.now(),
+        ),
+      ],
+      categorySpending: const [
+        CategorySpending(category: 'food', amount: 320, itemCount: 5),
+        CategorySpending(category: 'fun', amount: 200, itemCount: 2),
+      ],
+      summary: MonthlySummary(
+        month: DateTime(DateTime.now().year, DateTime.now().month),
+        totalSpent: 520,
+        receiptCount: 3,
+        amountByCategory: const {'food': 320, 'fun': 200},
+      ),
+    );
+
+    expect(find.text('Budget pace'), findsOneWidget);
+    expect(find.text('52% USED'), findsOneWidget);
+    expect(
+      find.text('The budget is halfway through the oven.'),
+      findsOneWidget,
+    );
+    expect(
+      find.textContaining('After expenses, \$480.00 remains'),
+      findsOneWidget,
+    );
+
+    await tester.scrollUntilVisible(
+      find.text('Category split'),
+      500,
+      scrollable: find.byType(Scrollable).first,
+    );
+
+    expect(find.text('Category split'), findsOneWidget);
+    expect(find.textContaining('where the money escaped'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('recipes screen presents locked crisis mode state', (
+    tester,
+  ) async {
+    await _pumpRecipesScreen(
+      tester,
+      snapshot: const BudgetSnapshot(
+        monthlyBudget: 1200,
+        fixedMonthlyExpenses: 200,
+        disposableBudget: 1000,
+        spentThisPeriod: 200,
+        remainingBudget: 800,
+        daysLeft: 20,
+        dailyLimit: 40,
+        desperationIndex: 30,
+      ),
+    );
+
+    expect(find.text('Emergency kitchen is still asleep.'), findsOneWidget);
+    expect(find.textContaining('30 Desperation Index points'), findsOneWidget);
+    expect(find.text('LOCKED'), findsOneWidget);
+
+    await tester.scrollUntilVisible(
+      find.text('Recipes are waiting for crisis mode.'),
+      500,
+      scrollable: find.byType(Scrollable).first,
+    );
+
+    expect(find.text('Recipes are waiting for crisis mode.'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('recipes screen adds Polish pantry suggestions', (tester) async {
+    await _pumpRecipesScreen(
+      tester,
+      language: AppLanguage.polish,
+      snapshot: const BudgetSnapshot(
+        monthlyBudget: 1200,
+        fixedMonthlyExpenses: 200,
+        disposableBudget: 1000,
+        spentThisPeriod: 780,
+        remainingBudget: 220,
+        daysLeft: 8,
+        dailyLimit: 27.5,
+        desperationIndex: 72,
+      ),
+    );
+
+    expect(find.text('Tryb przetrwania odblokowany.'), findsOneWidget);
+    expect(find.text('Pantry check: zacznij od dwóch rzeczy.'), findsOneWidget);
+    expect(find.text('makaron'), findsOneWidget);
+
+    await tester.tap(find.text('makaron'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), 'jajka');
+    await tester.testTextInput.receiveAction(TextInputAction.done);
+    await tester.pumpAndSettle();
+
+    expect(find.widgetWithText(Chip, 'makaron'), findsOneWidget);
+    expect(find.widgetWithText(Chip, 'jajka'), findsOneWidget);
+    expect(find.text('Generuj przepisy'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
 }
 
 Future<void> _pumpDashboard(
@@ -791,6 +989,90 @@ Future<void> _pumpDashboard(
         ],
         theme: buildAppTheme(AppThemePreset.pizza),
         home: const DashboardScreen(),
+      ),
+    ),
+  );
+
+  await tester.pumpAndSettle();
+}
+
+Future<void> _pumpStatsScreen(
+  WidgetTester tester, {
+  required BudgetSnapshot snapshot,
+  required List<ExpenseItem> expenses,
+  required List<CategorySpending> categorySpending,
+  required MonthlySummary summary,
+  AppLanguage language = AppLanguage.english,
+}) async {
+  await tester.pumpWidget(
+    ProviderScope(
+      overrides: [
+        initialAppLanguageProvider.overrideWithValue(language),
+        userProfileProvider.overrideWith((ref) async {
+          return const UserProfile(
+            id: 'user-id',
+            displayName: 'Tester',
+            monthlyBudget: 1200,
+            budgetResetDay: 1,
+            currency: 'USD',
+            timezone: 'Europe/Warsaw',
+            onboardingCompleted: true,
+          );
+        }),
+        budgetSnapshotProvider.overrideWith((ref) async => snapshot),
+        expenseHistoryProvider.overrideWith((ref) async => expenses),
+        categorySpendingProvider.overrideWith((ref) async => categorySpending),
+        monthlySummaryProvider.overrideWith((ref) async => summary),
+      ],
+      child: MaterialApp(
+        locale: language.locale,
+        supportedLocales: AppLanguage.values.map((language) => language.locale),
+        localizationsDelegates: const [
+          GlobalMaterialLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+        ],
+        theme: buildAppTheme(AppThemePreset.pizza),
+        home: const StatsScreen(currency: 'USD'),
+      ),
+    ),
+  );
+
+  await tester.pumpAndSettle();
+}
+
+Future<void> _pumpRecipesScreen(
+  WidgetTester tester, {
+  required BudgetSnapshot snapshot,
+  AppLanguage language = AppLanguage.english,
+}) async {
+  await tester.pumpWidget(
+    ProviderScope(
+      overrides: [
+        initialAppLanguageProvider.overrideWithValue(language),
+        userProfileProvider.overrideWith((ref) async {
+          return const UserProfile(
+            id: 'user-id',
+            displayName: 'Tester',
+            monthlyBudget: 1200,
+            budgetResetDay: 1,
+            currency: 'USD',
+            timezone: 'Europe/Warsaw',
+            onboardingCompleted: true,
+          );
+        }),
+        budgetSnapshotProvider.overrideWith((ref) async => snapshot),
+      ],
+      child: MaterialApp(
+        locale: language.locale,
+        supportedLocales: AppLanguage.values.map((language) => language.locale),
+        localizationsDelegates: const [
+          GlobalMaterialLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+        ],
+        theme: buildAppTheme(AppThemePreset.pizza),
+        home: const RecipesScreen(currency: 'USD'),
       ),
     ),
   );

@@ -98,3 +98,29 @@ Color _categoryColor(String category, BuildContext context) {
     _ => context.palette.secondaryGlow,
   };
 }
+
+String _normalizeCurrencyCode(String value) {
+  final code = value.trim().toUpperCase();
+  return supportedCurrencies.contains(code) ? code : 'PLN';
+}
+
+String _currencyLabel(BuildContext context, String code) {
+  final labels = context.text.isPolish
+      ? const {
+          'PLN': 'PLN - złoty polski',
+          'USD': 'USD - dolar amerykański',
+          'EUR': 'EUR - euro',
+          'GBP': 'GBP - funt brytyjski',
+          'CHF': 'CHF - frank szwajcarski',
+          'CZK': 'CZK - korona czeska',
+        }
+      : const {
+          'PLN': 'PLN - Polish zloty',
+          'USD': 'USD - US dollar',
+          'EUR': 'EUR - euro',
+          'GBP': 'GBP - British pound',
+          'CHF': 'CHF - Swiss franc',
+          'CZK': 'CZK - Czech koruna',
+        };
+  return labels[code] ?? code;
+}

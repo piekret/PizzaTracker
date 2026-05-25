@@ -267,6 +267,11 @@ class AppText {
   String get whenBudgetGetsUgly => isPolish
       ? 'Kiedy budżet robi się brzydki.'
       : 'When the budget gets ugly.';
+  String get offlineUnavailable => isPolish
+      ? 'Jesteś w trybie offline. Dane z cache możesz przeglądać, ale zmian nie da się teraz zapisać. '
+            'Połącz się z internetem i spróbuj ponownie.'
+      : 'You are in offline mode. Cached data is available to view, but changes cannot be saved right now. '
+            'Connect to the internet and try again.';
 
   String categoryLabel(String category) {
     return switch (category) {
@@ -343,9 +348,10 @@ class AppText {
     for (final prefix in ['Bad state: ', 'Exception: ']) {
       if (normalized.startsWith(prefix)) {
         normalized = normalized.substring(prefix.length);
-        if (!isPolish) {
-          return normalized;
+        if (_looksLikeOfflineError(normalized)) {
+          return offlineUnavailable;
         }
+        if (!isPolish) return normalized;
         final translated = _plKnown[normalized];
         if (translated != null) {
           return translated;
@@ -353,9 +359,34 @@ class AppText {
       }
     }
 
+    if (_looksLikeOfflineError(normalized)) {
+      return offlineUnavailable;
+    }
+
     if (!isPolish) return normalized;
     return normalized;
   }
+}
+
+bool _looksLikeOfflineError(String value) {
+  final normalized = value.toLowerCase();
+  return normalized.contains('socketexception') ||
+      normalized.contains('failed host lookup') ||
+      normalized.contains('failed to fetch') ||
+      normalized.contains('xmlhttprequest error') ||
+      normalized.contains('networkerror') ||
+      normalized.contains('network is unreachable') ||
+      normalized.contains('no address associated with hostname') ||
+      normalized.contains('nodename nor servname') ||
+      normalized.contains('no route to host') ||
+      normalized.contains('connection timed out') ||
+      normalized.contains('connection timeout') ||
+      normalized.contains('connection refused') ||
+      normalized.contains('connection reset') ||
+      normalized.contains('connection closed before full header') ||
+      normalized.contains('software caused connection abort') ||
+      normalized.contains('the internet connection appears to be offline') ||
+      normalized.contains('clientexception with socketexception');
 }
 
 const _plKnown = <String, String>{

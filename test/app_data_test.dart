@@ -248,6 +248,36 @@ void main() {
         );
       },
     );
+
+    test('English error translation explains offline write failures', () {
+      const text = AppText(AppLanguage.english);
+
+      expect(
+        text.translateKnown(
+          'ClientException with SocketException: Failed host lookup',
+        ),
+        contains('offline mode'),
+      );
+      expect(
+        text.translateKnown('Exception: Failed to fetch'),
+        contains('changes cannot be saved'),
+      );
+    });
+
+    test('Polish error translation explains offline write failures', () {
+      const text = AppText(AppLanguage.polish);
+
+      expect(
+        text.translateKnown(
+          'ClientException with SocketException: Failed host lookup',
+        ),
+        contains('Jesteś w trybie offline'),
+      );
+      expect(
+        text.translateKnown('Exception: Failed to fetch'),
+        contains('zmian nie da się teraz zapisać'),
+      );
+    });
   });
 
   group('supportedCurrencies', () {

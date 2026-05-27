@@ -237,6 +237,9 @@ class _ExpenseRow extends StatelessWidget {
       ),
       child: Icon(_categoryIcon(expense.category), color: color, size: 22),
     );
+    final date = MaterialLocalizations.of(
+      context,
+    ).formatMediumDate(expense.expenseDate);
     final details = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -248,7 +251,7 @@ class _ExpenseRow extends StatelessWidget {
         ),
         const SizedBox(height: 3),
         Text(
-          '${_categoryLabel(expense.category)} - ${MaterialLocalizations.of(context).formatMediumDate(expense.expenseDate)}',
+          '${_categoryLabel(expense.category)} - $date',
           style: Theme.of(context).textTheme.bodySmall?.copyWith(
             color: Theme.of(context).colorScheme.onSurfaceVariant,
           ),
@@ -257,11 +260,29 @@ class _ExpenseRow extends StatelessWidget {
         ),
       ],
     );
-    final amountText = Text(
-      amount,
-      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-        fontFeatures: const [FontFeature.tabularFigures()],
-      ),
+    final originalAmount = expense.hasCurrencyConversion
+        ? NumberFormat.simpleCurrency(
+            name: expense.originalCurrency,
+          ).format(expense.originalAmount)
+        : null;
+    final amountText = Column(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          amount,
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+            fontFeatures: const [FontFeature.tabularFigures()],
+          ),
+        ),
+        if (originalAmount != null)
+          Text(
+            originalAmount,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+          ),
+      ],
     );
     final receiptButton = expense.receiptId == null
         ? null
@@ -286,16 +307,22 @@ class _ExpenseRow extends StatelessWidget {
       itemBuilder: (context) => [
         PopupMenuItem(
           value: 'edit',
-          child: ListTile(
-            leading: const Icon(Icons.edit_outlined),
-            title: Text(context.text.edit),
+          child: Material(
+            type: MaterialType.transparency,
+            child: ListTile(
+              leading: const Icon(Icons.edit_outlined),
+              title: Text(context.text.edit),
+            ),
           ),
         ),
         PopupMenuItem(
           value: 'delete',
-          child: ListTile(
-            leading: const Icon(Icons.delete_outline),
-            title: Text(context.text.delete),
+          child: Material(
+            type: MaterialType.transparency,
+            child: ListTile(
+              leading: const Icon(Icons.delete_outline),
+              title: Text(context.text.delete),
+            ),
           ),
         ),
       ],

@@ -117,8 +117,28 @@ const expenseCategories = ['food', 'alcohol', 'hygiene', 'fun', 'other'];
 const supportedCurrencies = ['PLN', 'USD', 'EUR', 'GBP', 'CHF', 'CZK'];
 const receiptImagesBucket = 'receipt-images';
 const _receiptSelectColumns =
-    'id, store_name, total_amount, raw_ocr_text, analysis_json, image_path, scanned_at';
+    'id, store_name, total_amount, currency, original_total_amount, '
+    'exchange_rate_to_profile, raw_ocr_text, analysis_json, image_path, '
+    'scanned_at';
+const _legacyReceiptSelectColumns =
+    'id, store_name, total_amount, raw_ocr_text, analysis_json, image_path, '
+    'scanned_at';
+const _expenseSelectColumns =
+    'id, receipt_id, name, amount, currency, original_amount, '
+    'original_currency, exchange_rate_to_profile, category, expense_date, '
+    'created_at';
+const _legacyExpenseSelectColumns =
+    'id, receipt_id, name, amount, category, expense_date, created_at';
 const _offlineCachePrefix = 'offline_cache_v1';
+// Offline fallback rates relative to PLN; users can correct the receipt currency before saving.
+const _currencyValueInPln = <String, double>{
+  'PLN': 1,
+  'USD': 3.95,
+  'EUR': 4.3,
+  'GBP': 5.05,
+  'CHF': 4.6,
+  'CZK': 0.17,
+};
 
 int calculateDesperationIndex({
   required double disposableBudget,
@@ -303,15 +323,10 @@ class AppRepository {
     final cacheKey = _cacheKey(user.id, 'recent_expenses');
 
     try {
-      final rows = await _client
-          .from('expense_items')
-          .select(
-            'id, receipt_id, name, amount, category, expense_date, created_at',
-          )
-          .eq('user_id', user.id)
-          .order('expense_date', ascending: false)
-          .order('created_at', ascending: false)
-          .limit(12);
+      final rows = await _selectExpenseRows(
+        userId: user.id,
+        limit: 12,
+      );
       final maps = rows.map((row) => Map<String, dynamic>.from(row)).toList();
       await _writeCache(cacheKey, maps);
       return maps.map(ExpenseItem.fromMap).toList();
@@ -329,14 +344,7 @@ class AppRepository {
     final cacheKey = _cacheKey(user.id, 'expense_history');
 
     try {
-      final rows = await _client
-          .from('expense_items')
-          .select(
-            'id, receipt_id, name, amount, category, expense_date, created_at',
-          )
-          .eq('user_id', user.id)
-          .order('expense_date', ascending: false)
-          .order('created_at', ascending: false);
+      final rows = await _selectExpenseRows(userId: user.id);
       final maps = rows.map((row) => Map<String, dynamic>.from(row)).toList();
       await _writeCache(cacheKey, maps);
       return maps.map(ExpenseItem.fromMap).toList();
@@ -500,13 +508,24 @@ class AppRepository {
     required double amount,
     required String category,
     required DateTime expenseDate,
+    String? originalCurrency,
     String? receiptId,
   }) async {
     final user = _requireUser();
+    final profile = await getProfile();
+    final conversion = CurrencyConversion.fromOriginal(
+      originalAmount: amount,
+      originalCurrency: originalCurrency ?? profile.currency,
+      profileCurrency: profile.currency,
+    );
     final values = <String, Object?>{
       'user_id': user.id,
       'name': name.trim(),
-      'amount': amount,
+      'amount': conversion.convertedAmount,
+      'currency': conversion.profileCurrency,
+      'original_amount': conversion.originalAmount,
+      'original_currency': conversion.originalCurrency,
+      'exchange_rate_to_profile': conversion.exchangeRateToProfile,
       'category': category,
       'ai_categorized': false,
       'expense_date': DateFormat('yyyy-MM-dd').format(expenseDate),
@@ -515,7 +534,7 @@ class AppRepository {
       values['receipt_id'] = receiptId;
     }
 
-    await _client.from('expense_items').insert(values);
+    await _insertExpenseValues(values);
     await _clearExpenseCaches(user.id);
   }
 
@@ -523,8 +542,10 @@ class AppRepository {
     required String receiptId,
     required DateTime expenseDate,
     required List<ReceiptExpenseDraft> expenses,
+    String? originalCurrency,
   }) async {
     final user = _requireUser();
+    final profile = await getProfile();
     final sanitized = expenses
         .where(
           (expense) => expense.name.trim().isNotEmpty && expense.amount > 0,
@@ -549,18 +570,27 @@ class AppRepository {
       final category = expenseCategories.contains(expense.category)
           ? expense.category
           : 'other';
+      final conversion = CurrencyConversion.fromOriginal(
+        originalAmount: expense.amount,
+        originalCurrency: originalCurrency ?? expense.originalCurrency,
+        profileCurrency: profile.currency,
+      );
       return {
         'receipt_id': receiptId,
         'user_id': user.id,
         'name': expense.name.trim(),
-        'amount': expense.amount,
+        'amount': conversion.convertedAmount,
+        'currency': conversion.profileCurrency,
+        'original_amount': conversion.originalAmount,
+        'original_currency': conversion.originalCurrency,
+        'exchange_rate_to_profile': conversion.exchangeRateToProfile,
         'category': category,
         'ai_categorized': true,
         'expense_date': date,
       };
     }).toList();
 
-    await _client.from('expense_items').insert(values);
+    await _insertExpenseValues(values);
     await _clearExpenseCaches(user.id);
   }
 
@@ -570,12 +600,23 @@ class AppRepository {
     required double amount,
     required String category,
     required DateTime expenseDate,
+    String? originalCurrency,
     String? receiptId,
   }) async {
     final user = _requireUser();
+    final profile = await getProfile();
+    final conversion = CurrencyConversion.fromOriginal(
+      originalAmount: amount,
+      originalCurrency: originalCurrency ?? profile.currency,
+      profileCurrency: profile.currency,
+    );
     final values = <String, Object?>{
       'name': name.trim(),
-      'amount': amount,
+      'amount': conversion.convertedAmount,
+      'currency': conversion.profileCurrency,
+      'original_amount': conversion.originalAmount,
+      'original_currency': conversion.originalCurrency,
+      'exchange_rate_to_profile': conversion.exchangeRateToProfile,
       'category': category,
       'expense_date': DateFormat('yyyy-MM-dd').format(expenseDate),
     };
@@ -583,11 +624,7 @@ class AppRepository {
       values['receipt_id'] = receiptId;
     }
 
-    await _client
-        .from('expense_items')
-        .update(values)
-        .eq('id', id)
-        .eq('user_id', user.id);
+    await _updateExpenseValues(id: id, userId: user.id, values: values);
     await _clearExpenseCaches(user.id);
   }
 
@@ -597,15 +634,16 @@ class AppRepository {
     String? mimeType,
   }) async {
     final user = _requireUser();
-    final inserted = await _client
-        .from('receipts')
-        .insert({
-          'user_id': user.id,
-          'total_amount': 0,
-          'scanned_at': DateTime.now().toUtc().toIso8601String(),
-        })
-        .select(_receiptSelectColumns)
-        .single();
+    final profile = await getProfile();
+    final receiptValues = <String, Object?>{
+      'user_id': user.id,
+      'total_amount': 0,
+      'currency': profile.currency,
+      'original_total_amount': 0,
+      'exchange_rate_to_profile': 1,
+      'scanned_at': DateTime.now().toUtc().toIso8601String(),
+    };
+    final inserted = await _insertReceiptUploadValues(receiptValues);
     final receipt = ReceiptUpload.fromMap(Map<String, dynamic>.from(inserted));
     final extension = _receiptExtension(originalName, mimeType);
     final path =
@@ -625,13 +663,11 @@ class AppRepository {
           );
       uploadedPath = true;
 
-      final updated = await _client
-          .from('receipts')
-          .update({'image_path': path})
-          .eq('id', receipt.id)
-          .eq('user_id', user.id)
-          .select(_receiptSelectColumns)
-          .single();
+      final updated = await _updateReceiptImagePath(
+        receiptId: receipt.id,
+        userId: user.id,
+        path: path,
+      );
 
       return ReceiptUpload.fromMap(Map<String, dynamic>.from(updated));
     } catch (_) {
@@ -669,12 +705,7 @@ class AppRepository {
   Future<ReceiptUpload> getReceiptUpload(String receiptId) async {
     final user = _requireUser();
 
-    final row = await _client
-        .from('receipts')
-        .select(_receiptSelectColumns)
-        .eq('id', receiptId)
-        .eq('user_id', user.id)
-        .single();
+    final row = await _selectReceiptUpload(receiptId: receiptId, userId: user.id);
 
     return ReceiptUpload.fromMap(Map<String, dynamic>.from(row));
   }
@@ -881,6 +912,146 @@ class AppRepository {
     return InsightsResponse.fromMap(map);
   }
 
+  Future<List<dynamic>> _selectExpenseRows({
+    required String userId,
+    int? limit,
+  }) async {
+    try {
+      final query = _client
+          .from('expense_items')
+          .select(_expenseSelectColumns)
+          .eq('user_id', userId)
+          .order('expense_date', ascending: false)
+          .order('created_at', ascending: false);
+      if (limit != null) {
+        return await query.limit(limit);
+      }
+      return await query;
+    } catch (error) {
+      if (!_isMissingCurrencySchema(error)) {
+        rethrow;
+      }
+      final query = _client
+          .from('expense_items')
+          .select(_legacyExpenseSelectColumns)
+          .eq('user_id', userId)
+          .order('expense_date', ascending: false)
+          .order('created_at', ascending: false);
+      if (limit != null) {
+        return await query.limit(limit);
+      }
+      return await query;
+    }
+  }
+
+  Future<void> _insertExpenseValues(Object values) async {
+    try {
+      await _client.from('expense_items').insert(values);
+    } catch (error) {
+      if (!_isMissingCurrencySchema(error)) {
+        rethrow;
+      }
+      await _client
+          .from('expense_items')
+          .insert(_legacyExpenseInsertValues(values));
+    }
+  }
+
+  Future<void> _updateExpenseValues({
+    required String id,
+    required String userId,
+    required Map<String, Object?> values,
+  }) async {
+    try {
+      await _client
+          .from('expense_items')
+          .update(values)
+          .eq('id', id)
+          .eq('user_id', userId);
+    } catch (error) {
+      if (!_isMissingCurrencySchema(error)) {
+        rethrow;
+      }
+      await _client
+          .from('expense_items')
+          .update(_legacyExpenseValues(values))
+          .eq('id', id)
+          .eq('user_id', userId);
+    }
+  }
+
+  Future<dynamic> _insertReceiptUploadValues(
+    Map<String, Object?> values,
+  ) async {
+    try {
+      return await _client
+          .from('receipts')
+          .insert(values)
+          .select(_receiptSelectColumns)
+          .single();
+    } catch (error) {
+      if (!_isMissingCurrencySchema(error)) {
+        rethrow;
+      }
+      return await _client
+          .from('receipts')
+          .insert(_legacyReceiptValues(values))
+          .select(_legacyReceiptSelectColumns)
+          .single();
+    }
+  }
+
+  Future<dynamic> _updateReceiptImagePath({
+    required String receiptId,
+    required String userId,
+    required String path,
+  }) async {
+    try {
+      return await _client
+          .from('receipts')
+          .update({'image_path': path})
+          .eq('id', receiptId)
+          .eq('user_id', userId)
+          .select(_receiptSelectColumns)
+          .single();
+    } catch (error) {
+      if (!_isMissingCurrencySchema(error)) {
+        rethrow;
+      }
+      return await _client
+          .from('receipts')
+          .update({'image_path': path})
+          .eq('id', receiptId)
+          .eq('user_id', userId)
+          .select(_legacyReceiptSelectColumns)
+          .single();
+    }
+  }
+
+  Future<dynamic> _selectReceiptUpload({
+    required String receiptId,
+    required String userId,
+  }) async {
+    try {
+      return await _client
+          .from('receipts')
+          .select(_receiptSelectColumns)
+          .eq('id', receiptId)
+          .eq('user_id', userId)
+          .single();
+    } catch (error) {
+      if (!_isMissingCurrencySchema(error)) {
+        rethrow;
+      }
+      return await _client
+          .from('receipts')
+          .select(_legacyReceiptSelectColumns)
+          .eq('id', receiptId)
+          .eq('user_id', userId)
+          .single();
+    }
+  }
+
   Future<void> _deleteReceiptIfUnreferenced({
     required String receiptId,
     required String userId,
@@ -895,12 +1066,10 @@ class AppRepository {
       return;
     }
 
-    final row = await _client
-        .from('receipts')
-        .select(_receiptSelectColumns)
-        .eq('id', receiptId)
-        .eq('user_id', userId)
-        .maybeSingle();
+    final row = await _maybeSelectReceiptUpload(
+      receiptId: receiptId,
+      userId: userId,
+    );
     if (row == null) {
       return;
     }
@@ -908,6 +1077,30 @@ class AppRepository {
     await deleteReceiptUpload(
       ReceiptUpload.fromMap(Map<String, dynamic>.from(row)),
     );
+  }
+
+  Future<dynamic> _maybeSelectReceiptUpload({
+    required String receiptId,
+    required String userId,
+  }) async {
+    try {
+      return await _client
+          .from('receipts')
+          .select(_receiptSelectColumns)
+          .eq('id', receiptId)
+          .eq('user_id', userId)
+          .maybeSingle();
+    } catch (error) {
+      if (!_isMissingCurrencySchema(error)) {
+        rethrow;
+      }
+      return await _client
+          .from('receipts')
+          .select(_legacyReceiptSelectColumns)
+          .eq('id', receiptId)
+          .eq('user_id', userId)
+          .maybeSingle();
+    }
   }
 
   User _requireUser() {
@@ -1066,6 +1259,10 @@ class ExpenseItem {
     required this.amount,
     required this.category,
     required this.expenseDate,
+    this.currency = 'USD',
+    this.originalAmount,
+    this.originalCurrency,
+    this.exchangeRateToProfile,
     this.receiptId,
   });
 
@@ -1073,19 +1270,41 @@ class ExpenseItem {
   final String? receiptId;
   final String name;
   final double amount;
+  final String currency;
+  final double? originalAmount;
+  final String? originalCurrency;
+  final double? exchangeRateToProfile;
   final String category;
   final DateTime expenseDate;
 
   factory ExpenseItem.fromMap(Map<String, dynamic> map) {
+    final currency = _normalizeCurrencyCode(map['currency']?.toString());
+    final originalCurrency =
+        _normalizeCurrencyCodeOrNull(map['original_currency']?.toString()) ??
+        currency;
+    final originalAmount = map['original_amount'] == null
+        ? null
+        : _toDouble(map['original_amount']);
     return ExpenseItem(
       id: map['id'] as String,
       receiptId: map['receipt_id'] as String?,
       name: map['name'] as String,
       amount: _toDouble(map['amount']),
+      currency: currency,
+      originalAmount: originalAmount,
+      originalCurrency: originalCurrency,
+      exchangeRateToProfile: map['exchange_rate_to_profile'] == null
+          ? null
+          : _toDouble(map['exchange_rate_to_profile']),
       category: (map['category'] as String?) ?? 'other',
       expenseDate: DateTime.parse(map['expense_date'] as String),
     );
   }
+
+  bool get hasCurrencyConversion =>
+      originalAmount != null &&
+      originalCurrency != null &&
+      originalCurrency != currency;
 }
 
 class ReceiptUpload {
@@ -1093,7 +1312,10 @@ class ReceiptUpload {
     required this.id,
     required this.totalAmount,
     required this.scannedAt,
+    this.currency = 'USD',
     this.storeName,
+    this.originalTotalAmount,
+    this.exchangeRateToProfile,
     this.rawOcrText,
     this.analysis,
     this.imagePath,
@@ -1102,6 +1324,9 @@ class ReceiptUpload {
   final String id;
   final String? storeName;
   final double totalAmount;
+  final String currency;
+  final double? originalTotalAmount;
+  final double? exchangeRateToProfile;
   final String? rawOcrText;
   final ReceiptAnalysis? analysis;
   final String? imagePath;
@@ -1114,6 +1339,13 @@ class ReceiptUpload {
       id: map['id'] as String,
       storeName: map['store_name'] as String?,
       totalAmount: _toDouble(map['total_amount']),
+      currency: _normalizeCurrencyCode(map['currency']?.toString()),
+      originalTotalAmount: map['original_total_amount'] == null
+          ? null
+          : _toDouble(map['original_total_amount']),
+      exchangeRateToProfile: map['exchange_rate_to_profile'] == null
+          ? null
+          : _toDouble(map['exchange_rate_to_profile']),
       rawOcrText: map['raw_ocr_text'] as String?,
       analysis: rawAnalysis is Map
           ? ReceiptAnalysis.fromMap(Map<String, dynamic>.from(rawAnalysis))
@@ -1128,6 +1360,7 @@ class ReceiptAnalysis {
   const ReceiptAnalysis({
     this.storeName,
     this.totalAmount,
+    this.currency,
     this.expenseDate,
     this.category,
     this.description,
@@ -1137,6 +1370,7 @@ class ReceiptAnalysis {
 
   final String? storeName;
   final double? totalAmount;
+  final String? currency;
   final DateTime? expenseDate;
   final String? category;
   final String? description;
@@ -1145,6 +1379,7 @@ class ReceiptAnalysis {
 
   factory ReceiptAnalysis.fromMap(Map<String, dynamic> map) {
     final amount = map['totalAmount'] ?? map['total_amount'];
+    final rawCurrency = map['currency'] ?? map['detectedCurrency'];
     final rawDate = map['expenseDate'] ?? map['expense_date'];
     final rawCategory = map['category']?.toString();
     final rawItems = map['items'];
@@ -1163,6 +1398,7 @@ class ReceiptAnalysis {
     return ReceiptAnalysis(
       storeName: _blankToNull(map['storeName'] ?? map['store_name']),
       totalAmount: amount == null ? null : _toDouble(amount),
+      currency: _normalizeCurrencyCodeOrNull(rawCurrency?.toString()),
       expenseDate: rawDate == null ? null : DateTime.tryParse('$rawDate'),
       category: expenseCategories.contains(rawCategory) ? rawCategory : null,
       description: _blankToNull(map['description']),
@@ -1178,6 +1414,7 @@ class ReceiptAnalysis {
       (description != null && description!.isNotEmpty) ||
       (storeName != null && storeName!.isNotEmpty) ||
       (totalAmount != null && totalAmount! > 0) ||
+      currency != null ||
       expenseDate != null ||
       category != null;
 }
@@ -1187,20 +1424,24 @@ class ReceiptAnalysisItem {
     required this.name,
     required this.amount,
     required this.category,
+    this.currency,
   });
 
   final String name;
   final double amount;
   final String category;
+  final String? currency;
 
   factory ReceiptAnalysisItem.fromMap(Map<String, dynamic> map) {
     final rawCategory = map['category']?.toString();
+    final rawCurrency = map['currency'] ?? map['detectedCurrency'];
     return ReceiptAnalysisItem(
       name: _blankToNull(map['name']) ?? '',
       amount: _toDouble(map['amount']),
       category: expenseCategories.contains(rawCategory)
           ? rawCategory!
           : 'other',
+      currency: _normalizeCurrencyCodeOrNull(rawCurrency?.toString()),
     );
   }
 }
@@ -1210,11 +1451,13 @@ class ReceiptExpenseDraft {
     required this.name,
     required this.amount,
     required this.category,
+    this.originalCurrency,
   });
 
   final String name;
   final double amount;
   final String category;
+  final String? originalCurrency;
 }
 
 class CategorySpending {
@@ -1461,6 +1704,56 @@ class MonthlyInsights {
   }
 }
 
+class CurrencyConversion {
+  const CurrencyConversion({
+    required this.originalAmount,
+    required this.originalCurrency,
+    required this.profileCurrency,
+    required this.exchangeRateToProfile,
+    required this.convertedAmount,
+  });
+
+  final double originalAmount;
+  final String originalCurrency;
+  final String profileCurrency;
+  final double exchangeRateToProfile;
+  final double convertedAmount;
+
+  factory CurrencyConversion.fromOriginal({
+    required double originalAmount,
+    required String? originalCurrency,
+    required String profileCurrency,
+  }) {
+    final normalizedOriginal = _normalizeCurrencyCode(originalCurrency);
+    final normalizedProfile = _normalizeCurrencyCode(profileCurrency);
+    final rate = exchangeRate(
+      fromCurrency: normalizedOriginal,
+      toCurrency: normalizedProfile,
+    );
+    return CurrencyConversion(
+      originalAmount: originalAmount,
+      originalCurrency: normalizedOriginal,
+      profileCurrency: normalizedProfile,
+      exchangeRateToProfile: rate,
+      convertedAmount: _roundMoney(originalAmount * rate),
+    );
+  }
+
+  static double exchangeRate({
+    required String fromCurrency,
+    required String toCurrency,
+  }) {
+    final from = _normalizeCurrencyCode(fromCurrency);
+    final to = _normalizeCurrencyCode(toCurrency);
+    if (from == to) {
+      return 1;
+    }
+    final fromValue = _currencyValueInPln[from] ?? 1;
+    final toValue = _currencyValueInPln[to] ?? 1;
+    return fromValue / toValue;
+  }
+}
+
 class AbsurdPurchase {
   const AbsurdPurchase({
     required this.name,
@@ -1535,6 +1828,72 @@ bool _toBool(Object? value) {
     return value != 0;
   }
   return value?.toString().toLowerCase() == 'true';
+}
+
+bool _isMissingCurrencySchema(Object error) {
+  if (error is! PostgrestException) {
+    return false;
+  }
+  final text = [
+    error.message,
+    error.details,
+    error.hint,
+    error.code,
+  ].whereType<String>().join(' ').toLowerCase();
+  final mentionsCurrencyColumn =
+      text.contains('currency') ||
+      text.contains('original_amount') ||
+      text.contains('original_currency') ||
+      text.contains('original_total_amount') ||
+      text.contains('exchange_rate_to_profile');
+  final isMissingColumn =
+      text.contains('42703') ||
+      text.contains('pgrst204') ||
+      text.contains('column') ||
+      text.contains('schema cache');
+  return mentionsCurrencyColumn && isMissingColumn;
+}
+
+Map<String, Object?> _legacyExpenseValues(Map<String, Object?> values) {
+  return Map<String, Object?>.from(values)
+    ..remove('currency')
+    ..remove('original_amount')
+    ..remove('original_currency')
+    ..remove('exchange_rate_to_profile');
+}
+
+Object _legacyExpenseInsertValues(Object values) {
+  if (values is List) {
+    return values
+        .whereType<Map>()
+        .map((value) => _legacyExpenseValues(Map<String, Object?>.from(value)))
+        .toList();
+  }
+  if (values is Map) {
+    return _legacyExpenseValues(Map<String, Object?>.from(values));
+  }
+  return values;
+}
+
+Map<String, Object?> _legacyReceiptValues(Map<String, Object?> values) {
+  return Map<String, Object?>.from(values)
+    ..remove('currency')
+    ..remove('original_total_amount')
+    ..remove('exchange_rate_to_profile');
+}
+
+String _normalizeCurrencyCode(String? value) {
+  final code = value?.trim().toUpperCase() ?? '';
+  return supportedCurrencies.contains(code) ? code : 'PLN';
+}
+
+String? _normalizeCurrencyCodeOrNull(String? value) {
+  final code = value?.trim().toUpperCase() ?? '';
+  return supportedCurrencies.contains(code) ? code : null;
+}
+
+double _roundMoney(double value) {
+  return (value * 100).roundToDouble() / 100;
 }
 
 Map<String, dynamic> _responseMap(Object? data) {

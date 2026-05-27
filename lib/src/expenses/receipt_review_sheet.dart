@@ -18,6 +18,7 @@ class _ReceiptReviewSheetState extends ConsumerState<ReceiptReviewSheet> {
   final _formKey = GlobalKey<FormState>();
   late final List<_ReceiptItemDraft> _items;
   late DateTime _expenseDate;
+  late String _currency;
 
   bool _isSaving = false;
   String? _error;
@@ -26,6 +27,7 @@ class _ReceiptReviewSheetState extends ConsumerState<ReceiptReviewSheet> {
   void initState() {
     super.initState();
     _expenseDate = _safeExpenseDate(widget.analysis.expenseDate);
+    _currency = widget.analysis.currency ?? widget.receipt.currency;
     _items = widget.analysis.items
         .map((item) => _ReceiptItemDraft.fromAnalysis(item))
         .toList();
@@ -65,6 +67,7 @@ class _ReceiptReviewSheetState extends ConsumerState<ReceiptReviewSheet> {
           name: item.name.text,
           amount: double.parse(item.amount.text.replaceAll(',', '.')),
           category: item.category,
+          originalCurrency: _currency,
         );
       }).toList();
 
@@ -74,6 +77,7 @@ class _ReceiptReviewSheetState extends ConsumerState<ReceiptReviewSheet> {
             receiptId: widget.receipt.id,
             expenseDate: _expenseDate,
             expenses: expenses,
+            originalCurrency: _currency,
           );
       await _refreshExpenseData();
 
@@ -125,7 +129,15 @@ class _ReceiptReviewSheetState extends ConsumerState<ReceiptReviewSheet> {
   Widget build(BuildContext context) {
     final currency =
         ref.watch(userProfileProvider).asData?.value.currency ?? 'USD';
-    final formatter = NumberFormat.simpleCurrency(name: currency);
+    final formatter = NumberFormat.simpleCurrency(name: _currency);
+    final profileFormatter = NumberFormat.simpleCurrency(name: currency);
+    final conversion = _total <= 0
+        ? null
+        : CurrencyConversion.fromOriginal(
+            originalAmount: _total,
+            originalCurrency: _currency,
+            profileCurrency: currency,
+          );
     final confidence = widget.analysis.confidence;
     final text = context.text;
     final receiptTotal = widget.analysis.totalAmount;
@@ -179,6 +191,43 @@ class _ReceiptReviewSheetState extends ConsumerState<ReceiptReviewSheet> {
               formatter: formatter,
               onPickDate: _pickExpenseDate,
             ),
+            const SizedBox(height: 10),
+            DropdownButtonFormField<String>(
+              isExpanded: true,
+              initialValue: _normalizeCurrencyCode(_currency),
+              decoration: InputDecoration(
+                labelText: text.isPolish ? 'Waluta paragonu' : 'Receipt currency',
+                prefixIcon: const Icon(Icons.currency_exchange_outlined),
+              ),
+              selectedItemBuilder: (context) {
+                return supportedCurrencies
+                    .map((currency) => Text(currency))
+                    .toList();
+              },
+              items: supportedCurrencies.map((currency) {
+                return DropdownMenuItem(
+                  value: currency,
+                  child: Text(
+                    _currencyLabel(context, currency),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                );
+              }).toList(),
+              onChanged: (value) => setState(() => _currency = value ?? currency),
+            ),
+            if (conversion != null &&
+                conversion.originalCurrency != conversion.profileCurrency) ...[
+              const SizedBox(height: 10),
+              _InlineInfo(
+                message: text.isPolish
+                    ? '${formatter.format(conversion.originalAmount)} '
+                          'zostanie przeliczone lokalnym kursem i zapisane jako '
+                          '${profileFormatter.format(conversion.convertedAmount)}.'
+                    : '${formatter.format(conversion.originalAmount)} '
+                          'will be converted with the app rate and saved as '
+                          '${profileFormatter.format(conversion.convertedAmount)}.',
+              ),
+            ],
             if (showMismatch) ...[
               const SizedBox(height: 10),
               _InlineError(

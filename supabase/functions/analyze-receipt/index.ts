@@ -12,6 +12,13 @@ const receiptSchema = {
   properties: {
     storeName: { type: "STRING", nullable: true },
     totalAmount: { type: "NUMBER", nullable: true },
+    currency: {
+      type: "STRING",
+      nullable: true,
+      enum: ["PLN", "USD", "EUR", "GBP", "CHF", "CZK"],
+      description:
+        "Detected receipt currency from symbols or ISO codes, if visible.",
+    },
     expenseDate: {
       type: "STRING",
       nullable: true,
@@ -46,6 +53,11 @@ const receiptSchema = {
         properties: {
           name: { type: "STRING" },
           amount: { type: "NUMBER" },
+          currency: {
+            type: "STRING",
+            nullable: true,
+            enum: ["PLN", "USD", "EUR", "GBP", "CHF", "CZK"],
+          },
           category: {
             type: "STRING",
             enum: ["food", "alcohol", "hygiene", "fun", "other"],
@@ -58,6 +70,7 @@ const receiptSchema = {
   required: [
     "storeName",
     "totalAmount",
+    "currency",
     "expenseDate",
     "category",
     "description",
@@ -107,22 +120,31 @@ serve(async (req) => {
     const localOcrText = typeof rawText === "string" ? rawText.trim() : "";
     const languageCode = normalizeLanguage(language);
 
-    const { data: receipt, error: receiptError } = await admin
+    let receiptResult = await admin
       .from("receipts")
-      .select("id, user_id, image_path")
+      .select("id, user_id, image_path, currency")
       .eq("id", receiptId)
       .eq("user_id", user.id)
       .single();
+    if (isMissingCurrencySchema(receiptResult.error)) {
+      receiptResult = await admin
+        .from("receipts")
+        .select("id, user_id, image_path")
+        .eq("id", receiptId)
+        .eq("user_id", user.id)
+        .single();
+    }
+    const { data: receipt, error: receiptError } = receiptResult;
 
     if (receiptError || !receipt) {
       return json({ error: "Receipt not found" }, 404);
     }
-    let imageUrl: string | null = null;
-    if (!localOcrText) {
-      if (!receipt.image_path) {
-        return json({ error: "Receipt has no OCR text or image" }, 400);
-      }
+    if (!localOcrText && !receipt.image_path) {
+      return json({ error: "Receipt has no OCR text or image" }, 400);
+    }
 
+    let imageUrl: string | null = null;
+    if (receipt.image_path) {
       const { data: signed, error: signedError } = await admin.storage
         .from("receipt-images")
         .createSignedUrl(receipt.image_path, 60 * 10);
@@ -139,17 +161,38 @@ serve(async (req) => {
       imageUrl,
       language: languageCode,
     });
+    const receiptCurrency = extracted.currency ?? receipt.currency ?? "USD";
 
-    await admin
+    const updateValues = {
+      store_name: extracted.storeName,
+      total_amount: extracted.totalAmount ?? 0,
+      currency: receiptCurrency,
+      original_total_amount: extracted.totalAmount ?? 0,
+      exchange_rate_to_profile: 1,
+      raw_ocr_text: (extracted.rawText ?? localOcrText) || null,
+      analysis_json: extracted,
+    };
+    let updateResult = await admin
       .from("receipts")
-      .update({
-        store_name: extracted.storeName,
-        total_amount: extracted.totalAmount ?? 0,
-        raw_ocr_text: (extracted.rawText ?? localOcrText) || null,
-        analysis_json: extracted,
-      })
+      .update(updateValues)
       .eq("id", receipt.id)
       .eq("user_id", user.id);
+    if (isMissingCurrencySchema(updateResult.error)) {
+      const {
+        currency: _currency,
+        original_total_amount: _originalTotalAmount,
+        exchange_rate_to_profile: _exchangeRateToProfile,
+        ...legacyUpdateValues
+      } = updateValues;
+      updateResult = await admin
+        .from("receipts")
+        .update(legacyUpdateValues)
+        .eq("id", receipt.id)
+        .eq("user_id", user.id);
+    }
+    if (updateResult.error) {
+      return json({ error: updateResult.error.message }, 500);
+    }
 
     return json(extracted);
   } catch (error) {
@@ -177,10 +220,10 @@ async function analyzeWithGemini({
   const parts: Array<Record<string, unknown>> = [
     {
       text: rawText
-        ? `Categorize this locally extracted receipt OCR text. Prefer real purchasable line items; ignore receipt metadata, payment lines, loyalty messages, taxes, and change due unless they are the only usable amount.\n\nReceipt OCR text:\n${
+        ? `Categorize this receipt. Use the uploaded image as the source of truth and the local OCR text only as a helper. Extract every visible purchasable line item; do not stop after the first item. Ignore receipt metadata, payment lines, loyalty messages, taxes, and change due unless they are the only usable amount.\n\nLocal OCR text:\n${
           clipText(rawText, 14000)
         }`
-        : "Extract this receipt into line items and app-ready expense fields.",
+        : "Extract this receipt image into line items and app-ready expense fields. Extract every visible purchasable line item; do not stop after the first item.",
     },
   ];
   const languageInstruction = language === "pl"
@@ -202,7 +245,7 @@ async function analyzeWithGemini({
           parts: [
             {
               text:
-                `You extract receipt details for a student budgeting app. Return only fields allowed by the schema. Use the visible grand total, not subtotal. For items, return purchasable line items with prices and categories from food, alcohol, hygiene, fun, other. If line items are unclear, return an empty items array and still provide the best single expense fields. ${languageInstruction}`,
+                `You extract receipt details for a student budgeting app. Return only fields allowed by the schema. Use the visible grand total, not subtotal. Detect the receipt currency from ISO codes and symbols such as zł, PLN, €, EUR, $, USD, £, GBP, CHF, Kč, CZK. For items, return all visible purchasable line items with prices, the detected currency when visible, and categories from food, alcohol, hygiene, fun, other. Do not return only the first line item when more item rows are visible. If line items are genuinely unclear, return an empty items array and still provide the best single expense fields. ${languageInstruction}`,
             },
           ],
         },
@@ -242,6 +285,21 @@ function normalizeLanguage(value: unknown): "en" | "pl" {
     : "en";
 }
 
+function isMissingCurrencySchema(error: any): boolean {
+  if (!error) return false;
+  const text = `${error.message ?? ""} ${error.details ?? ""} ${
+    error.hint ?? ""
+  } ${error.code ?? ""}`.toLowerCase();
+  const mentionsCurrencyColumn = text.includes("currency") ||
+    text.includes("original_total_amount") ||
+    text.includes("exchange_rate_to_profile");
+  const isMissingColumn = text.includes("42703") ||
+    text.includes("pgrst204") ||
+    text.includes("column") ||
+    text.includes("schema cache");
+  return mentionsCurrencyColumn && isMissingColumn;
+}
+
 function extractGeminiText(payload: any): string | null {
   const candidate = payload?.candidates?.[0];
   const parts = candidate?.content?.parts;
@@ -279,6 +337,9 @@ function bufferToBase64(buffer: Uint8Array): string {
 
 function normalizeReceipt(value: any, fallbackRawText: string) {
   const items = normalizeItems(value.items);
+  const detectedCurrency = normalizeCurrency(value.currency) ??
+    dominantCurrency(items) ??
+    detectCurrencyFromText(fallbackRawText);
   const category = normalizeCategory(value.category) ??
     dominantCategory(items) ?? "other";
   const itemTotal = items.reduce((sum, item) => sum + item.amount, 0);
@@ -292,6 +353,7 @@ function normalizeReceipt(value: any, fallbackRawText: string) {
   return {
     storeName: blankToNull(value.storeName),
     totalAmount,
+    currency: detectedCurrency,
     expenseDate: dateOrNull(value.expenseDate),
     category,
     description: blankToNull(value.description) ??
@@ -313,11 +375,42 @@ function normalizeItems(value: unknown) {
         amount: typeof item?.amount === "number" && item.amount > 0
           ? Math.round(item.amount * 100) / 100
           : 0,
+        currency: normalizeCurrency(item?.currency),
         category: normalizeCategory(item?.category) ?? "other",
       };
     })
     .filter((item) => item.name.length > 0 && item.amount > 0)
     .slice(0, 80);
+}
+
+function normalizeCurrency(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const code = value.trim().toUpperCase();
+  return ["PLN", "USD", "EUR", "GBP", "CHF", "CZK"].includes(code)
+    ? code
+    : null;
+}
+
+function dominantCurrency(items: Array<{ currency: string | null }>) {
+  const counts = new Map<string, number>();
+  for (const item of items) {
+    if (item.currency) {
+      counts.set(item.currency, (counts.get(item.currency) ?? 0) + 1);
+    }
+  }
+  return [...counts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
+}
+
+function detectCurrencyFromText(value: string): string | null {
+  const text = value.toUpperCase();
+  if (/\bPLN\b|ZŁ|ZL/.test(text)) return "PLN";
+  if (/\bEUR\b|€/.test(text)) return "EUR";
+  if (/\bGBP\b|£/.test(text)) return "GBP";
+  if (/\bCHF\b/.test(text)) return "CHF";
+  if (/\bCZK\b|KČ|KC/.test(text)) return "CZK";
+  if (/\bUSD\b|US\$/.test(text)) return "USD";
+  if (/\$/.test(text)) return "USD";
+  return null;
 }
 
 function normalizeCategory(value: unknown): string | null {

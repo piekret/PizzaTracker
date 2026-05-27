@@ -8,18 +8,25 @@ void main() {
       final analysis = ReceiptAnalysis.fromMap({
         'storeName': 'Pizza Place',
         'totalAmount': 42.5,
+        'currency': 'EUR',
         'expenseDate': '2026-05-10',
         'category': 'food',
         'description': 'Pizza Place dinner',
         'confidence': 0.82,
         'items': [
           {'name': 'Margherita', 'amount': 32.5, 'category': 'food'},
-          {'name': 'Cola', 'amount': 10, 'category': 'other'},
+          {
+            'name': 'Cola',
+            'amount': 10,
+            'currency': 'EUR',
+            'category': 'other',
+          },
         ],
       });
 
       expect(analysis.storeName, 'Pizza Place');
       expect(analysis.totalAmount, 42.5);
+      expect(analysis.currency, 'EUR');
       expect(analysis.expenseDate, DateTime(2026, 5, 10));
       expect(analysis.category, 'food');
       expect(analysis.description, 'Pizza Place dinner');
@@ -28,6 +35,7 @@ void main() {
       expect(analysis.items.first.name, 'Margherita');
       expect(analysis.items.first.amount, 32.5);
       expect(analysis.items.first.category, 'food');
+      expect(analysis.items.last.currency, 'EUR');
       expect(analysis.hasUsefulSuggestion, isTrue);
     });
 
@@ -200,6 +208,42 @@ void main() {
       expect(restored.category, 'food');
       expect(restored.amount, 42.5);
       expect(restored.itemCount, 3);
+    });
+  });
+
+  group('currency conversion', () {
+    test('converts original receipt currency into profile currency', () {
+      final conversion = CurrencyConversion.fromOriginal(
+        originalAmount: 10,
+        originalCurrency: 'EUR',
+        profileCurrency: 'PLN',
+      );
+
+      expect(conversion.originalCurrency, 'EUR');
+      expect(conversion.profileCurrency, 'PLN');
+      expect(conversion.exchangeRateToProfile, greaterThan(1));
+      expect(conversion.convertedAmount, 43);
+    });
+
+    test('expense items preserve original currency metadata', () {
+      final expense = ExpenseItem.fromMap({
+        'id': 'expense-id',
+        'receipt_id': null,
+        'name': 'Coffee',
+        'amount': 17.2,
+        'currency': 'PLN',
+        'original_amount': 4,
+        'original_currency': 'EUR',
+        'exchange_rate_to_profile': 4.3,
+        'category': 'food',
+        'expense_date': '2026-05-10',
+      });
+
+      expect(expense.amount, 17.2);
+      expect(expense.currency, 'PLN');
+      expect(expense.originalAmount, 4);
+      expect(expense.originalCurrency, 'EUR');
+      expect(expense.hasCurrencyConversion, isTrue);
     });
   });
 

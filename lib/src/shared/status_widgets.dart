@@ -96,3 +96,33 @@ class _InlineError extends StatelessWidget {
     );
   }
 }
+
+class _InlineInfo extends StatelessWidget {
+  const _InlineInfo({required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: context.palette.primaryGlow.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: context.palette.border),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            Icons.info_outline,
+            size: 18,
+            color: context.palette.primaryGlow,
+          ),
+          const SizedBox(width: 10),
+          Expanded(child: Text(context.text.translateKnown(message))),
+        ],
+      ),
+    );
+  }
+}

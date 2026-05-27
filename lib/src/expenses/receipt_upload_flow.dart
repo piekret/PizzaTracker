@@ -173,6 +173,7 @@ ReceiptAnalysis? _fallbackAnalysisFromOcr(String? rawText) {
 
   final storeName = _guessReceiptStore(lines);
   final totalAmount = _guessReceiptTotal(lines);
+  final currency = _guessReceiptCurrency(text);
   if (storeName == null && totalAmount == null) {
     return null;
   }
@@ -180,6 +181,7 @@ ReceiptAnalysis? _fallbackAnalysisFromOcr(String? rawText) {
   return ReceiptAnalysis(
     storeName: storeName,
     totalAmount: totalAmount,
+    currency: currency,
     description: storeName == null
         ? AppText(
             AppLanguage.fromCode(Intl.getCurrentLocale()),
@@ -190,6 +192,29 @@ ReceiptAnalysis? _fallbackAnalysisFromOcr(String? rawText) {
     category: 'other',
     confidence: 0.35,
   );
+}
+
+String? _guessReceiptCurrency(String text) {
+  final normalized = text.toUpperCase();
+  if (RegExp(r'\bPLN\b|ZŁ|ZL').hasMatch(normalized)) {
+    return 'PLN';
+  }
+  if (RegExp(r'\bEUR\b|€').hasMatch(normalized)) {
+    return 'EUR';
+  }
+  if (RegExp(r'\bGBP\b|£').hasMatch(normalized)) {
+    return 'GBP';
+  }
+  if (RegExp(r'\bCHF\b').hasMatch(normalized)) {
+    return 'CHF';
+  }
+  if (RegExp(r'\bCZK\b|KČ|KC').hasMatch(normalized)) {
+    return 'CZK';
+  }
+  if (RegExp(r'\bUSD\b|US\$|\$').hasMatch(normalized)) {
+    return 'USD';
+  }
+  return null;
 }
 
 String? _guessReceiptStore(List<String> lines) {

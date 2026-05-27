@@ -22,6 +22,7 @@ class _AddExpenseSheetState extends ConsumerState<AddExpenseSheet> {
   late final TextEditingController _amountController;
 
   String _category = 'food';
+  String _currency = 'PLN';
   DateTime _expenseDate = DateTime.now();
   bool _isSaving = false;
   String? _error;
@@ -40,6 +41,7 @@ class _AddExpenseSheetState extends ConsumerState<AddExpenseSheet> {
     final analysis = widget.receiptAnalysis;
     final suggestedName = analysis?.description ?? analysis?.storeName ?? '';
     final suggestedAmount = analysis?.totalAmount;
+    final originalAmount = expense?.originalAmount;
 
     _nameController = TextEditingController(
       text: expense?.name ?? suggestedName,
@@ -49,11 +51,16 @@ class _AddExpenseSheetState extends ConsumerState<AddExpenseSheet> {
           ? suggestedAmount == null || suggestedAmount <= 0
                 ? ''
                 : suggestedAmount.toStringAsFixed(2)
-          : expense.amount.toStringAsFixed(2),
+          : (originalAmount ?? expense.amount).toStringAsFixed(2),
     );
     _category = expenseCategories.contains(expense?.category)
         ? expense!.category
         : analysis?.category ?? 'other';
+    _currency =
+        expense?.originalCurrency ??
+        analysis?.currency ??
+        widget.receipt?.currency ??
+        'PLN';
     _expenseDate =
         expense?.expenseDate ?? analysis?.expenseDate ?? DateTime.now();
   }
@@ -86,6 +93,7 @@ class _AddExpenseSheetState extends ConsumerState<AddExpenseSheet> {
           amount: amount,
           category: _category,
           expenseDate: _expenseDate,
+          originalCurrency: _currency,
           receiptId: widget.receipt?.id,
         );
         if (mounted) {
@@ -98,6 +106,7 @@ class _AddExpenseSheetState extends ConsumerState<AddExpenseSheet> {
           amount: amount,
           category: _category,
           expenseDate: _expenseDate,
+          originalCurrency: _currency,
           receiptId: widget.receipt?.id,
         );
         if (mounted) {
@@ -145,6 +154,18 @@ class _AddExpenseSheetState extends ConsumerState<AddExpenseSheet> {
   @override
   Widget build(BuildContext context) {
     final text = context.text;
+    final profileCurrency =
+        ref.watch(userProfileProvider).asData?.value.currency ?? 'PLN';
+    final parsedAmount = double.tryParse(
+      _amountController.text.replaceAll(',', '.'),
+    );
+    final conversion = parsedAmount == null || parsedAmount <= 0
+        ? null
+        : CurrencyConversion.fromOriginal(
+            originalAmount: parsedAmount,
+            originalCurrency: _currency,
+            profileCurrency: profileCurrency,
+          );
     return AppSheetFrame(
       child: Form(
         key: _formKey,
@@ -191,6 +212,7 @@ class _AddExpenseSheetState extends ConsumerState<AddExpenseSheet> {
                 decimal: true,
               ),
               textInputAction: TextInputAction.next,
+              onChanged: (_) => setState(() {}),
               validator: (value) {
                 final amount = double.tryParse(
                   (value ?? '').replaceAll(',', '.'),
@@ -201,6 +223,37 @@ class _AddExpenseSheetState extends ConsumerState<AddExpenseSheet> {
                 return null;
               },
             ),
+            const SizedBox(height: 12),
+            DropdownButtonFormField<String>(
+              isExpanded: true,
+              initialValue: _normalizeCurrencyCode(_currency),
+              decoration: InputDecoration(
+                labelText: text.isPolish ? 'Waluta wydatku' : 'Expense currency',
+                prefixIcon: const Icon(Icons.currency_exchange_outlined),
+              ),
+              selectedItemBuilder: (context) {
+                return supportedCurrencies
+                    .map((currency) => Text(currency))
+                    .toList();
+              },
+              items: supportedCurrencies.map((currency) {
+                return DropdownMenuItem(
+                  value: currency,
+                  child: Text(
+                    _currencyLabel(context, currency),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                );
+              }).toList(),
+              onChanged: (value) {
+                setState(() => _currency = value ?? profileCurrency);
+              },
+            ),
+            if (conversion != null &&
+                conversion.originalCurrency != conversion.profileCurrency) ...[
+              const SizedBox(height: 12),
+              _CurrencyConversionNotice(conversion: conversion),
+            ],
             const SizedBox(height: 12),
             DropdownButtonFormField<String>(
               initialValue: _category,
@@ -314,6 +367,57 @@ class _AttachedReceiptNotice extends StatelessWidget {
   }
 }
 
+class _CurrencyConversionNotice extends StatelessWidget {
+  const _CurrencyConversionNotice({required this.conversion});
+
+  final CurrencyConversion conversion;
+
+  @override
+  Widget build(BuildContext context) {
+    final originalFormatter = NumberFormat.simpleCurrency(
+      name: conversion.originalCurrency,
+    );
+    final profileFormatter = NumberFormat.simpleCurrency(
+      name: conversion.profileCurrency,
+    );
+    final text = context.text;
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: context.palette.primaryGlow.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: context.palette.border),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            Icons.currency_exchange_outlined,
+            color: context.palette.primaryGlow,
+            size: 18,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              text.isPolish
+                  ? '${originalFormatter.format(conversion.originalAmount)} '
+                        'zostanie przeliczone lokalnym kursem i zapisane jako '
+                        '${profileFormatter.format(conversion.convertedAmount)}.'
+                  : '${originalFormatter.format(conversion.originalAmount)} '
+                        'will be converted with the app rate and saved as '
+                        '${profileFormatter.format(conversion.convertedAmount)}.',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _ReceiptAnalysisSummary extends StatelessWidget {
   const _ReceiptAnalysisSummary({required this.analysis});
 
@@ -327,6 +431,7 @@ class _ReceiptAnalysisSummary extends StatelessWidget {
         analysis.items.length == 1
             ? '1 line item'
             : '${analysis.items.length} line items',
+      if (analysis.currency != null) analysis.currency!,
       if (analysis.category != null) _categoryLabel(analysis.category!),
       if (analysis.expenseDate != null)
         DateFormat.yMMMd().format(analysis.expenseDate!),
